@@ -1,0 +1,50 @@
+<Window x:Class="MozartBrowser.Dialogs.ReauthenticateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Confirm it's you" Width="340" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        WindowStyle="None"
+        Background="{DynamicResource ChromeBackgroundBrush}">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" GlassFrameThickness="0"
+                      CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Height="36" Background="{DynamicResource ChromeBackgroundBrush}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="Confirm it's you" FontSize="12" Margin="14,0"
+                       VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+            <Button Grid.Column="1" Style="{StaticResource CloseButton}" Width="36" Height="36"
+                    Click="CancelButton_Click" Content="✕" ToolTip="Close"/>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Margin="20">
+            <TextBlock Text="Enter your Windows account password to view this saved password."
+                       FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+            <PasswordBox x:Name="PasswordInput" Margin="0,0,0,4" KeyDown="PasswordInput_KeyDown"/>
+
+            <TextBlock x:Name="ErrorText" Text="That password wasn't correct. Try again."
+                       FontSize="11" Foreground="#E5484D" Visibility="Collapsed" Margin="0,4,0,0"/>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Cancel" Padding="12,4" Margin="0,0,8,0" Click="CancelButton_Click"/>
+                <Button Content="Confirm" Padding="12,4" Click="ConfirmButton_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

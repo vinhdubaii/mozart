@@ -1,0 +1,32 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Dark counterpart of Light.xaml — same keys, must stay in sync. -->
+    <Color x:Key="ChromeBackgroundColor">#2B2B30</Color>
+    <Color x:Key="ChromeBorderColor">#3F3F46</Color>
+    <Color x:Key="TabActiveColor">#3A3A40</Color>
+    <Color x:Key="TabInactiveColor">#00000000</Color>
+    <Color x:Key="AccentColor">#5CA6F5</Color>
+    <Color x:Key="TextPrimaryColor">#F0F0F2</Color>
+    <Color x:Key="TextSecondaryColor">#A8A8AD</Color>
+    <Color x:Key="SurfaceColor">#232327</Color>
+    <Color x:Key="SurfaceAltColor">#3A3A40</Color>
+    <Color x:Key="SidebarSelectedColor">#2E4A6E</Color>
+
+    <!-- Dark counterpart of the Light overlay above — dark and translucent,
+         instead of light and translucent, so white text stays legible. -->
+    <Color x:Key="AddressPillOverlayColor">#CC1C1C20</Color>
+
+    <SolidColorBrush x:Key="ChromeBackgroundBrush" Color="{StaticResource ChromeBackgroundColor}"/>
+    <SolidColorBrush x:Key="ChromeBorderBrush" Color="{StaticResource ChromeBorderColor}"/>
+    <SolidColorBrush x:Key="TabActiveBrush" Color="{StaticResource TabActiveColor}"/>
+    <SolidColorBrush x:Key="TabInactiveBrush" Color="{StaticResource TabInactiveColor}"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="{StaticResource SurfaceAltColor}"/>
+    <SolidColorBrush x:Key="SidebarSelectedBrush" Color="{StaticResource SidebarSelectedColor}"/>
+    <SolidColorBrush x:Key="AddressPillOverlayBrush" Color="{StaticResource AddressPillOverlayColor}"/>
+
+</ResourceDictionary>

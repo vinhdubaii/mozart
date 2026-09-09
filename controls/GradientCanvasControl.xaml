@@ -1,0 +1,54 @@
+<UserControl x:Class="MozartBrowser.Controls.GradientCanvasControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel>
+
+        <!-- Gradient preview / editor surface. Stops are free-dragged anywhere
+             inside this rectangle (2D, not constrained to a line), matching
+             Zen Browser's picker. -->
+        <Border x:Name="PreviewBorder" Width="360" Height="220" CornerRadius="10"
+                BorderBrush="{DynamicResource ChromeBorderBrush}" BorderThickness="1"
+                Background="{DynamicResource SurfaceAltBrush}" ClipToBounds="True"
+                HorizontalAlignment="Left">
+            <Canvas x:Name="StopCanvas" SizeChanged="StopCanvas_SizeChanged"/>
+        </Border>
+
+        <Grid Margin="0,10,0,0" Width="360" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="AddStopButton" Grid.Column="0" Content="+ Add color stop"
+                    Padding="10,5" Click="AddStopButton_Click"/>
+            <TextBlock x:Name="MaxStopsHint" Grid.Column="1" Text="Max 3 color stops reached"
+                       FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"
+                       VerticalAlignment="Center" HorizontalAlignment="Right"
+                       Visibility="Collapsed"/>
+        </Grid>
+
+        <!-- Editor for whichever stop is currently selected -->
+        <StackPanel x:Name="StopEditorPanel" Margin="0,16,0,0" Width="360" HorizontalAlignment="Left"
+                    Visibility="Collapsed">
+            <TextBlock Text="Selected stop color" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
+
+            <StackPanel x:Name="SwatchRow" Orientation="Horizontal" Margin="0,0,0,10"/>
+
+            <Button x:Name="CustomColorButton" Content="Custom color..." HorizontalAlignment="Left"
+                    Padding="8,4" Margin="0,0,0,10" Click="CustomColorButton_Click"/>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Hex:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBox x:Name="HexBox" Grid.Column="1" Width="120" HorizontalAlignment="Left"
+                         TextChanged="HexBox_TextChanged"/>
+                <Button Grid.Column="2" Content="Remove stop" Margin="10,0,0,0" Padding="8,4"
+                        Click="RemoveStopButton_Click"/>
+            </Grid>
+        </StackPanel>
+
+    </StackPanel>
+</UserControl>

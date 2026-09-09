@@ -1,0 +1,37 @@
+<UserControl x:Class="MozartBrowser.Controls.LibraryPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border BorderBrush="{DynamicResource ChromeBorderBrush}" BorderThickness="1,0,0,0"
+            Background="{DynamicResource ChromeBackgroundBrush}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="10,10,10,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Library" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="✕" Width="26" Height="26"
+                        Style="{StaticResource ChromeIconButton}" Click="CloseButton_Click"/>
+            </Grid>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="10,0,10,8">
+                <RadioButton x:Name="BookmarksTabButton" Content="Bookmarks" GroupName="LibraryTab"
+                             IsChecked="True" Margin="0,0,12,0" Checked="Tab_Checked"/>
+                <RadioButton x:Name="HistoryTabButton" Content="History" GroupName="LibraryTab"
+                             Margin="0,0,12,0" Checked="Tab_Checked"/> <!-- hidden in private windows, see IsPrivateMode -->
+                <RadioButton x:Name="DownloadsTabButton" Content="Downloads" GroupName="LibraryTab"
+                             Checked="Tab_Checked"/>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="ListItems" Margin="6"/>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</UserControl>

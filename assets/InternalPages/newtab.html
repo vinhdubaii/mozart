@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>New Tab</title>
+    <link rel="stylesheet" href="shared/base.css" />
+</head>
+<body>
+    <main style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:12px;">
+        <h1 style="font-weight:600;">Mozart Browser</h1>
+        <p class="mozart-text-secondary">New Tab page — pinned &amp; recently visited tiles land here next.</p>
+        <p id="bridge-status" class="mozart-text-secondary" style="font-size:12px;">Checking bridge…</p>
+    </main>
+
+    <script src="shared/mozart-bridge.js"></script>
+    <script>
+        MozartBridge.call("system.ping")
+            .then((r) => {
+                document.getElementById("bridge-status").textContent =
+                    `Bridge OK — Mozart Browser ${r.version} · ${r.time}`;
+            })
+            .catch((err) => {
+                document.getElementById("bridge-status").textContent = `Bridge error: ${err.message}`;
+            });
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms> <!-- needed for FolderBrowserDialog in Settings -->
+    <DisableWinExeOutputInference>true</DisableWinExeOutputInference>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MozartBrowser</AssemblyName>
+    <RootNamespace>MozartBrowser</RootNamespace>
+    <Version>0.6.1</Version>
+    <Product>Mozart Browser</Product>
+    <Company>Lidora Studio</Company>
+    <Copyright>Copyright © vinhdubaii</Copyright>
+  </PropertyGroup>
+
+  <!-- ApplicationIcon is only wired up once assets\mozart.ico actually exists,
+       so the project still builds while the assets folder is empty. Drop a
+       real .ico at assets\mozart.ico and this activates automatically. -->
+  <PropertyGroup Condition="Exists('assets\mozart.ico')">
+    <ApplicationIcon>assets\mozart.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Bumped 2026-08-22: was 1.0.2792.45 (pinned to Chromium ~130, Aug 2024).
+         1.0.4129.50 is the current Release/stable SDK as of this bump - not a
+         -prerelease build, since this app ships to real users. Keep this and
+         WebView2.Runtime.X64 below in sync: each SDK release's notes state
+         the minimum Runtime version it needs (see
+         https://aka.ms/webviewrelease) - 1.0.4129.50 lines up with Runtime
+         151, which is why the pin below is also 151.x. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+
+    <!-- Fixed Version WebView2 Runtime, bundled directly into the app so it
+         never depends on the system's Evergreen Runtime (which can fail to
+         initialize on trimmed-down Windows images — see WebViewEnvironmentService
+         for the full explanation). This is a community-maintained package
+         (not published by Microsoft) that repackages Microsoft's official
+         Fixed Version .cab as NuGet; bump the Version here to pick up a newer
+         Chromium build. It copies its "WebView2\" folder to the output/publish
+         directory automatically — no extra MSBuild wiring needed. It is large
+         (~250MB), so first restore will take a while; this is expected.
+
+         Bumped 2026-08-22: was 131.0.2903.63 (Chromium 131, Nov 2024) -> now
+         151.0.4129.86, matching the current Microsoft Edge/WebView2 Runtime
+         release (151.0.4129.59, Aug. 7 2026) and the SDK version pinned
+         above. This community package has stayed current through 151.x, so
+         no fallback to manually managing the Fixed Version .cab was needed. -->
+    <PackageReference Include="WebView2.Runtime.X64" Version="151.0.4129.86" />
+  </ItemGroup>
+
+  <!-- UseWPF + UseWindowsForms both add implicit global usings for their
+       namespaces. System.Windows.Forms/System.Drawing and
+       System.Windows.Controls/Input/Media share several type names
+       (UserControl, Application, ComboBox, KeyEventArgs, Brush, Brushes,
+       Color, ColorConverter), which causes CS0104 "ambiguous reference"
+       errors. Removing the WinForms/Drawing global usings keeps WPF types
+       resolving implicitly; any WinForms type (e.g. FolderBrowserDialog)
+       just needs to be referenced with its full name,
+       System.Windows.Forms.X / System.Drawing.X. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- assets folder is kept empty on purpose (user will add real icons later).
+         Remove this ItemGroup exclusion once assets/mozart.ico exists, or keep
+         ApplicationIcon commented out until then to avoid a build error. -->
+    <None Remove="assets\**" />
+  </ItemGroup>
+
+  <!-- Mozart's own "chrome://"-style internal pages (New Tab, History,
+       Downloads, Settings — see services/browser/InternalPages.cs). These are real
+       HTML/CSS/JS files, not embedded resources, so they need an explicit
+       Content item (unaffected by the None Remove="assets\**" exclusion
+       above, which only targets the None item type) to actually land next
+       to MozartBrowser.exe at build/publish time. Without this,
+       SetVirtualHostNameToFolderMapping would point at a folder that only
+       exists in the source tree, not in the output directory. -->
+  <ItemGroup>
+    <Content Include="assets\InternalPages\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,120 @@
+<Window x:Class="MozartBrowser.Dialogs.ColorPickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Pick a color" Width="300" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        WindowStyle="None"
+        Background="{DynamicResource ChromeBackgroundBrush}">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="0" GlassFrameThickness="0"
+                      CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ===================== Custom title bar ===================== -->
+        <Grid Grid.Row="0" Height="36" Background="{DynamicResource ChromeBackgroundBrush}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="Pick a color" FontSize="12" Margin="14,0"
+                       VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
+
+            <Button Grid.Column="1" Style="{StaticResource CloseButton}" Width="36" Height="36"
+                    Click="CancelButton_Click" Content="✕" ToolTip="Close"/>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Margin="20">
+
+            <!-- ===================== Saturation/Value square =====================
+                 Three stacked layers, the standard trick for an HSV picker in XAML:
+                   1. Solid pure-hue color (changes with the hue bar below)
+                   2. Horizontal white -> transparent (saturation: left=white, right=full hue)
+                   3. Vertical transparent -> black (value: top=bright, bottom=black)
+                 A draggable dot marks the current S/V position. -->
+            <Border x:Name="SvSquareBorder" Width="260" Height="180" CornerRadius="6"
+                    ClipToBounds="True" HorizontalAlignment="Left"
+                    MouseLeftButtonDown="SvSquare_MouseLeftButtonDown"
+                    MouseMove="SvSquare_MouseMove" MouseLeftButtonUp="SvSquare_MouseLeftButtonUp">
+                <Grid>
+                    <Rectangle x:Name="HueLayer" Fill="Red"/>
+                    <Rectangle>
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                <GradientStop Color="#00FFFFFF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Rectangle>
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#00000000" Offset="0"/>
+                                <GradientStop Color="#FF000000" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Canvas x:Name="SvDotCanvas" IsHitTestVisible="False">
+                        <Ellipse x:Name="SvDot" Width="14" Height="14" StrokeThickness="2"
+                                 Stroke="White" Fill="Transparent"/>
+                    </Canvas>
+                </Grid>
+            </Border>
+
+            <!-- ===================== Hue bar ===================== -->
+            <Border x:Name="HueBarBorder" Width="260" Height="16" CornerRadius="4" Margin="0,10,0,0"
+                    ClipToBounds="True" HorizontalAlignment="Left"
+                    MouseLeftButtonDown="HueBar_MouseLeftButtonDown"
+                    MouseMove="HueBar_MouseMove" MouseLeftButtonUp="HueBar_MouseLeftButtonUp">
+                <Grid>
+                    <Rectangle>
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="#FF0000" Offset="0.0"/>
+                                <GradientStop Color="#FFFF00" Offset="0.1667"/>
+                                <GradientStop Color="#00FF00" Offset="0.3333"/>
+                                <GradientStop Color="#00FFFF" Offset="0.5"/>
+                                <GradientStop Color="#0000FF" Offset="0.6667"/>
+                                <GradientStop Color="#FF00FF" Offset="0.8333"/>
+                                <GradientStop Color="#FF0000" Offset="1.0"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <Canvas x:Name="HueThumbCanvas" IsHitTestVisible="False">
+                        <Rectangle x:Name="HueThumb" Width="4" Height="16" Fill="White"
+                                   Stroke="Black" StrokeThickness="1"/>
+                    </Canvas>
+                </Grid>
+            </Border>
+
+            <!-- ===================== Presets (kept, per request) ===================== -->
+            <TextBlock Text="Presets" FontSize="11" Margin="0,14,0,6"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <StackPanel x:Name="PresetRow" Orientation="Horizontal"/>
+
+            <!-- ===================== Hex + actions ===================== -->
+            <Grid Margin="0,14,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Hex:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBox x:Name="HexBox" Grid.Column="1" HorizontalAlignment="Left" Width="120"
+                         TextChanged="HexBox_TextChanged"/>
+            </Grid>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Cancel" Padding="12,4" Margin="0,0,8,0" Click="CancelButton_Click"/>
+                <Button Content="OK" Padding="12,4" Click="OkButton_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>Downloads</title>
+    <link rel="stylesheet" href="shared/base.css" />
+</head>
+<body>
+    <main style="max-width:720px; margin:40px auto; padding:0 20px;">
+        <h1 style="font-weight:600;">Downloads</h1>
+        <p class="mozart-text-secondary">Live download list with progress, Open / Show in folder lands here next.</p>
+        <p id="bridge-status" class="mozart-text-secondary" style="font-size:12px;">Checking bridge…</p>
+    </main>
+
+    <script src="shared/mozart-bridge.js"></script>
+    <script>
+        MozartBridge.call("system.ping")
+            .then((r) => {
+                document.getElementById("bridge-status").textContent =
+                    `Bridge OK — Mozart Browser ${r.version} · ${r.time}`;
+            })
+            .catch((err) => {
+                document.getElementById("bridge-status").textContent = `Bridge error: ${err.message}`;
+            });
+    </script>
+</body>
+</html>

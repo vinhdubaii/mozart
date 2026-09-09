@@ -1,0 +1,181 @@
+<Window x:Class="MozartBrowser.Chrome.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:MozartBrowser.Controls"
+        Title="Mozart Browser"
+        Height="800" Width="1280"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource ChromeBackgroundBrush}"
+        WindowStyle="None"
+        AllowsTransparency="False">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0"
+                      ResizeBorderThickness="6"
+                      GlassFrameThickness="0"
+                      CornerRadius="0"
+                      UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Row 0: unified title bar / toolbar -->
+            <RowDefinition Height="Auto"/> <!-- Row 1: tab strip (collapsed when 1 tab) -->
+            <RowDefinition Height="Auto"/> <!-- Row 2: bookmark bar (toggle) -->
+            <RowDefinition Height="*"/>    <!-- Row 3: content host -->
+        </Grid.RowDefinitions>
+
+        <!-- ============================= Row 0: Toolbar / custom title bar ============================= -->
+        <Grid x:Name="ToolbarRow" Grid.Row="0" Height="44" Background="{DynamicResource ChromeBackgroundBrush}"
+              MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/> <!-- nav buttons -->
+                <ColumnDefinition Width="*"/>    <!-- address bar -->
+                <ColumnDefinition Width="Auto"/> <!-- library / menu -->
+                <ColumnDefinition Width="Auto"/> <!-- min/max/close -->
+            </Grid.ColumnDefinitions>
+
+            <!-- Navigation buttons. Icons are real vector Paths converted from an
+                 SVGRepo icon set (rounded-stroke outline style), not Unicode
+                 glyph characters — see NavIconButton's doc comment in App.xaml
+                 for why that matters for touch-target/legibility. -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="8,0,4,0" VerticalAlignment="Center">
+                <Button x:Name="BackButton" Style="{StaticResource NavIconButton}" Click="BackButton_Click" ToolTip="Back">
+                    <Path Style="{StaticResource NavIconPath}" Data="M15,19 L9,12 L10.5,10.25 M15,5 L13,7.33333"/>
+                </Button>
+                <Button x:Name="ForwardButton" Style="{StaticResource NavIconButton}" Click="ForwardButton_Click" ToolTip="Forward">
+                    <Path Style="{StaticResource NavIconPath}" Data="M9,5 L11,7.33333 M9,19 L15,12 L13.5,10.25"/>
+                </Button>
+                <Button x:Name="ReloadButton" Style="{StaticResource NavIconButton}" Click="ReloadButton_Click" ToolTip="Reload">
+                    <!-- Filled icon (not stroke-outline like the rest), so Fill/Stroke
+                         are set directly here instead of inheriting NavIconPath's
+                         transparent-fill/stroked-outline look. -->
+                    <Path Width="18" Height="18" Stretch="Uniform"
+                          Fill="{DynamicResource TextPrimaryBrush}" Stroke="{x:Null}"
+                          Data="M3.67981,11.3333H2.92981H3.67981ZM3.67981,13L3.15157,13.5324C3.44398,13.8225 3.91565,13.8225 4.20805,13.5324L3.67981,13ZM5.88787,11.8657C6.18191,11.574 6.18377,11.0991 5.89203,10.8051C5.60029,10.511 5.12542,10.5092 4.83138,10.8009L5.88787,11.8657ZM2.52824,10.8009C2.2342,10.5092 1.75933,10.511 1.46759,10.8051C1.17585,11.0991 1.17772,11.574 1.47176,11.8657L2.52824,10.8009ZM18.6156,7.39279C18.8325,7.74565 19.2944,7.85585 19.6473,7.63892C20.0001,7.42199 20.1103,6.96007 19.8934,6.60721L18.6156,7.39279ZM16.8931,3.60787C16.5403,3.39077 16.0784,3.50074 15.8613,3.8535C15.6442,4.20626 15.7541,4.66822 16.1069,4.88532L16.8931,3.60787ZM12.4633,3.75939C12.877,3.77966 13.2288,3.46071 13.2491,3.047C13.2694,2.63328 12.9504,2.28146 12.5367,2.26119L12.4633,3.75939ZM12.0789,2.25C7.03155,2.25 2.92981,6.3112 2.92981,11.3333H4.42981C4.42981,7.15072 7.84884,3.75 12.0789,3.75V2.25ZM2.92981,11.3333L2.92981,13H4.42981L4.42981,11.3333H2.92981ZM4.20805,13.5324L5.88787,11.8657L4.83138,10.8009L3.15157,12.4676L4.20805,13.5324ZM4.20805,12.4676L2.52824,10.8009L1.47176,11.8657L3.15157,13.5324L4.20805,12.4676ZM19.8934,6.60721C19.1441,5.38846 18.1143,4.35941 16.8931,3.60787L16.1069,4.88532C17.1287,5.51419 17.9899,6.37506 18.6156,7.39279L19.8934,6.60721ZM12.5367,2.26119C12.385,2.25376 12.2323,2.25 12.0789,2.25V3.75C12.2078,3.75 12.336,3.75316 12.4633,3.75939L12.5367,2.26119Z M11.8825,21V21.75V21ZM20.3137,12.6667H21.0637H20.3137ZM20.3137,11L20.8409,10.4666C20.5487,10.1778 20.0786,10.1778 19.7864,10.4666L20.3137,11ZM18.1002,12.1333C17.8056,12.4244 17.8028,12.8993 18.094,13.1939C18.3852,13.4885 18.86,13.4913 19.1546,13.2001L18.1002,12.1333ZM21.4727,13.2001C21.7673,13.4913 22.2421,13.4885 22.5333,13.1939C22.8245,12.8993 22.8217,12.4244 22.5271,12.1332L21.4727,13.2001ZM5.31769,16.6061C5.10016,16.2536 4.63806,16.1442 4.28557,16.3618C3.93307,16.5793 3.82366,17.0414 4.0412,17.3939L5.31769,16.6061ZM11.5331,20.2423C11.1193,20.224 10.769,20.5447 10.7507,20.9585C10.7325,21.3723 11.0531,21.7226 11.4669,21.7408L11.5331,20.2423ZM7.11292,20.4296C7.4677,20.6433 7.92861,20.529 8.14239,20.1742C8.35617,19.8195 8.24186,19.3586 7.88708,19.1448L7.11292,20.4296ZM11.8825,21.75C16.9448,21.75 21.0637,17.6915 21.0637,12.6667H19.5637C19.5637,16.8466 16.133,20.25 11.8825,20.25V21.75ZM21.0637,12.6667V11H19.5637V12.6667H21.0637ZM19.7864,10.4666L18.1002,12.1333L19.1546,13.2001L20.8409,11.5334L19.7864,10.4666ZM19.7864,11.5334L21.4727,13.2001L22.5271,12.1332L20.8409,10.4666L19.7864,11.5334ZM11.4669,21.7408C11.6047,21.7469 11.7433,21.75 11.8825,21.75V20.25C11.7653,20.25 11.6488,20.2474 11.5331,20.2423L11.4669,21.7408ZM4.0412,17.3939C4.80569,18.6327 5.86106,19.6752 7.11292,20.4296L7.88708,19.1448C6.83872,18.5131 5.95602,17.6405 5.31769,16.6061L4.0412,17.3939Z"/>
+                </Button>
+                <Button x:Name="HomeButton" Style="{StaticResource NavIconButton}" Click="HomeButton_Click" ToolTip="Home">
+                    <Path Style="{StaticResource NavIconPath}"
+                          Data="M9,16C9.85038,16.6303 10.8846,17 12,17C13.1154,17 14.1496,16.6303 15,16 M21.6359,12.9579L21.3572,14.8952C20.8697,18.2827 20.626,19.9764 19.451,20.9882C18.2759,22 16.5526,22 13.1061,22H10.8939C7.44737,22 5.72409,22 4.54903,20.9882C3.37396,19.9764 3.13025,18.2827 2.64284,14.8952L2.36407,12.9579C1.98463,10.3208 1.79491,9.00229 2.33537,7.87495C2.87583,6.7476 4.02619,6.06234 6.32691,4.69181L7.71175,3.86687C9.80104,2.62229 10.8457,2 12,2C13.1543,2 14.199,2.62229 16.2882,3.86687L17.6731,4.69181C19.9738,6.06234 21.1242,6.7476 21.6646,7.87495"/>
+                </Button>
+                <Button x:Name="NewTabButton" Style="{StaticResource NavIconButton}" Click="NewTabButton_Click" ToolTip="New Tab (Ctrl+T)">
+                    <Path Style="{StaticResource NavIconPath}"
+                          Data="M15,12L12,12M12,12L9,12M12,12L12,9M12,12L12,15 M22,12C22,16.714 22,19.0711 20.5355,20.5355C19.0711,22 16.714,22 12,22C7.28595,22 4.92893,22 3.46447,20.5355C2,19.0711 2,16.714 2,12C2,7.28595 2,4.92893 3.46447,3.46447C4.92893,2 7.28595,2 12,2C16.714,2 19.0711,2 20.5355,3.46447C21.5093,4.43821 21.8356,5.80655 21.9449,8"/>
+                </Button>
+            </StackPanel>
+
+            <!-- Address bar: pill shape, lock + text + star inline. Background is a
+                 semi-transparent themed overlay (not a hardcoded color) so a Custom
+                 Themes gradient behind the toolbar shows through softly while typed
+                 text stays legible in both Light and Dark mode — see
+                 Themes/Light.xaml + Dark.xaml's AddressPillOverlayBrush. -->
+            <Border Grid.Column="1" Background="{DynamicResource AddressPillOverlayBrush}" CornerRadius="16" MinHeight="32"
+                    Margin="60,0,60,0" VerticalAlignment="Center">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Visibility (not the icon itself) toggles with the page's
+                         HTTPS status in code-behind, replacing the old emoji's
+                         "swap to empty text" approach. -->
+                    <Path x:Name="LockIcon" Grid.Column="0" Style="{StaticResource SidebarIconPath}"
+                          Width="13" Height="13" Margin="12,0,4,0" VerticalAlignment="Center"
+                          Stroke="{DynamicResource TextSecondaryBrush}"
+                          Data="M12,14V18 M6,10V8C6,7.65929 6.0284,7.32521 6.08296,7M18,10V8C18,4.68629 15.3137,2 12,2C10.208,2 8.59942,2.78563 7.5,4.03126 M11,22H8C5.17157,22 3.75736,22 2.87868,21.1213C2,20.2426 2,18.8284 2,16C2,13.1716 2,11.7574 2.87868,10.8787C3.75736,10 5.17157,10 8,10H16C18.8284,10 20.2426,10 21.1213,10.8787C22,11.7574 22,13.1716 22,16C22,18.8284 22,20.2426 21.1213,21.1213C20.2426,22 18.8284,22 16,22H15"/>
+
+                    <TextBox x:Name="AddressBarTextBox" Grid.Column="1"
+                             Background="Transparent" BorderThickness="0"
+                             VerticalAlignment="Center" VerticalContentAlignment="Center"
+                             FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"
+                             KeyDown="AddressBarTextBox_KeyDown"
+                             GotFocus="AddressBarTextBox_GotFocus"/>
+
+                    <!-- Fill toggles between Transparent (not bookmarked) and the
+                         accent brush (bookmarked) in code-behind, on this one
+                         star-outline path — replacing the old ☆/★ character swap. -->
+                    <Button x:Name="BookmarkStarButton" Grid.Column="2" Style="{StaticResource ChromeIconButton}"
+                            Width="28" Height="28" Margin="0,0,2,0" Click="BookmarkStarButton_Click"
+                            ToolTip="Bookmark this page">
+                        <Path x:Name="BookmarkStarPath" Width="15" Height="15" Stretch="Uniform"
+                              Fill="Transparent" Stroke="{DynamicResource TextPrimaryBrush}"
+                              StrokeThickness="1.5" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                              Data="M6.03954,7.77203C3.57986,8.32856 2.35002,8.60682 2.05742,9.54773C1.76482,10.4886 2.60325,11.4691 4.2801,13.4299L4.71392,13.9372C5.19043,14.4944 5.42868,14.773 5.53586,15.1177C5.64305,15.4624 5.60703,15.8341 5.53498,16.5776L5.4694,17.2544C5.21588,19.8706 5.08912,21.1787 5.85515,21.7602C6.62118,22.3417 7.77268,21.8115 10.0757,20.7512L10.6715,20.4768C11.3259,20.1755 11.6531,20.0248 12,20.0248C12.3469,20.0248 12.6741,20.1755 13.3285,20.4768L13.9243,20.7512C16.2273,21.8115 17.3788,22.3417 18.1449,21.7602C18.9109,21.1787 18.7841,19.8706 18.5306,17.2544M19.7199,13.4299C21.3968,11.4691 22.2352,10.4886 21.9426,9.54773C21.65,8.60682 20.4201,8.32856 17.9605,7.77203L17.3241,7.62805C16.6251,7.4699 16.2757,7.39083 15.9951,7.17781C15.7144,6.96479 15.5345,6.64193 15.1745,5.99623L14.8468,5.40837C13.5802,3.13612 12.9469,2 12,2C11.0531,2 10.4198,3.13613 9.15316,5.40838"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- Pinned extensions + puzzle icon + Library + menu -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="4,0" VerticalAlignment="Center">
+                <!-- Populated at runtime by RebuildPinnedExtensionIcons(), one
+                     NavIconButton per pinned extension, in pin order. -->
+                <StackPanel x:Name="PinnedExtensionsPanel" Orientation="Horizontal"/>
+
+                <Button x:Name="ExtensionsButton" Style="{StaticResource NavIconButton}" Click="ExtensionsButton_Click"
+                        ToolTip="Extensions">
+                    <Path Style="{StaticResource NavIconPath}"
+                          Data="M2.5 6.5C2.5 8.70914 4.29086 10.5 6.5 10.5H9.16667C9.47666 10.5 9.63165 10.5 9.75882 10.4659C10.1039 10.3735 10.3735 10.1039 10.4659 9.75882C10.5 9.63165 10.5 9.47666 10.5 9.16667V6.5C10.5 4.29086 8.70914 2.5 6.5 2.5M17.5 21.5C15.2909 21.5 13.5 19.7091 13.5 17.5V14.8333C13.5 14.5233 13.5 14.3683 13.5341 14.2412C13.6265 13.8961 13.8961 13.6265 14.2412 13.5341C14.3683 13.5 14.5233 13.5 14.8333 13.5H17.5C19.7091 13.5 21.5 15.2909 21.5 17.5M2.5 17.5C2.5 15.2909 4.29086 13.5 6.5 13.5H8.9C9.46005 13.5 9.74008 13.5 9.95399 13.609C10.1422 13.7049 10.2951 13.8578 10.391 14.046C10.5 14.2599 10.5 14.5399 10.5 15.1V17.5C10.5 19.7091 8.70914 21.5 6.5 21.5C4.29086 21.5 2.5 19.7091 2.5 17.5ZM13.5 6.5C13.5 4.29086 15.2909 2.5 17.5 2.5C19.7091 2.5 21.5 4.29086 21.5 6.5C21.5 8.70914 19.7091 10.5 17.5 10.5H14.6429C14.5102 10.5 14.4438 10.5 14.388 10.4937C13.9244 10.4415 13.5585 10.0756 13.5063 9.61196C13.5 9.55616 13.5 9.48982 13.5 9.35714V6.5Z"/>
+                </Button>
+                <Button x:Name="LibraryButton" Style="{StaticResource NavIconButton}" Click="LibraryButton_Click"
+                        ToolTip="Bookmarks, History &amp; Downloads">
+                    <Path Style="{StaticResource NavIconPath}"
+                          Data="M19.5617,7C19.7904,5.69523 18.7863,4.5 17.4617,4.5H6.53788C5.21323,4.5 4.20922,5.69523 4.43784,7 M17.4999,4.5C17.5283,4.24092 17.5425,4.11135 17.5427,4.00435C17.545,2.98072 16.7739,2.12064 15.7561,2.01142C15.6497,2 15.5194,2 15.2588,2H8.74099C8.48035,2 8.35002,2 8.24362,2.01142C7.22584,2.12064 6.45481,2.98072 6.45704,4.00434C6.45727,4.11135 6.47146,4.2409 6.49983,4.5 M15,18H9 M21.1935,16.793C20.8437,19.2739 20.6689,20.5143 19.7717,21.2572C18.8745,22 17.5512,22 14.9046,22H9.09536C6.44881,22 5.12553,22 4.22834,21.2572C3.33115,20.5143 3.15626,19.2739 2.80648,16.793L2.38351,13.793C1.93748,10.6294 1.71447,9.04765 2.66232,8.02383C3.61017,7 5.29758,7 8.67239,7H15.3276C18.7024,7 20.3898,7 21.3377,8.02383C22.0865,8.83268 22.1045,9.98979 21.8592,12"/>
+                </Button>
+                <Button x:Name="MenuButton" Style="{StaticResource NavIconButton}" Click="MenuButton_Click" ToolTip="Menu">
+                    <Path Style="{StaticResource NavIconPath}"
+                          Data="M4,7L7,7M20,7L11,7 M20,17H17M4,17L13,17 M4,12H7L20,12"/>
+                </Button>
+            </StackPanel>
+
+            <!-- Window controls -->
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="4,0,4,0">
+                <Button Style="{StaticResource ChromeIconButton}" Click="MinimizeButton_Click" Content="—" ToolTip="Minimize"/>
+                <Button x:Name="MaximizeButton" Style="{StaticResource ChromeIconButton}" Click="MaximizeButton_Click" Content="▢" ToolTip="Maximize"/>
+                <Button Style="{StaticResource CloseButton}" Click="CloseButton_Click" Content="✕" ToolTip="Close"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ============================= Row 1: Tab strip (visible only when >= 2 tabs) ============================= -->
+        <Border x:Name="TabStripBorder" Grid.Row="1" Background="{DynamicResource ChromeBackgroundBrush}"
+                BorderBrush="{DynamicResource ChromeBorderBrush}" BorderThickness="0,0,0,1">
+            <ItemsControl x:Name="TabStripItems" Height="34">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="6,0"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </Border>
+
+        <!-- ============================= Row 2: Bookmark bar (toggle via menu) ============================= -->
+        <Border x:Name="BookmarkBarHost" Grid.Row="2" Height="30"
+                Background="{DynamicResource ChromeBackgroundBrush}"
+                BorderBrush="{DynamicResource ChromeBorderBrush}" BorderThickness="0,0,0,1"
+                Visibility="Collapsed">
+            <ItemsControl x:Name="BookmarkBarItems">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="8,0"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </Border>
+
+        <!-- ============================= Row 3: Content host + slide-out Library panel ============================= -->
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Each BrowserTab's WebView2 (or NewTabPage) is added here in code-behind,
+                 with only the active tab's element set to Visible. -->
+            <Grid x:Name="TabContentHost" Grid.Column="0"/>
+
+            <controls:LibraryPanel x:Name="LibraryPanelControl" Grid.Column="1"
+                                 Width="340" Visibility="Collapsed"/>
+        </Grid>
+    </Grid>
+</Window>
