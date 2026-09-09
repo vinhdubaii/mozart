@@ -1,0 +1,81 @@
+name: Release
+
+# Trigger by pushing a tag like v1.2.0 — UpdateService.cs compares this
+# tag (minus the leading "v") against the running app's assembly version.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Generate app icon from source PNG
+        shell: pwsh
+        run: |
+          $source = "assets/source/mozart-logo-2000.png"
+          if (Test-Path $source) {
+            choco install imagemagick.app --no-progress -y --params "/NoLegacySupport" | Out-Null
+            refreshenv
+            magick convert $source -define icon:auto-resize=256,128,64,48,32,16 assets/mozart.ico
+            Write-Host "Generated assets/mozart.ico from $source"
+          } else {
+            Write-Host "::warning::$source not found — releasing without an app icon."
+          }
+
+      - name: Restore
+        run: dotnet restore Mozart.csproj
+
+      - name: Publish (self-contained, win-x64)
+        run: >
+          dotnet publish Mozart.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          -p:Version=${{ steps.version.outputs.version }}
+          --output publish
+
+      - name: Verify bundled WebView2 runtime is present
+        shell: bash
+        run: |
+          if [ ! -d "publish/WebView2" ]; then
+            echo "::error::publish/WebView2 is missing — the WebView2.Runtime.X64 package didn't copy its output. Installer would ship without a working browser engine on machines lacking the Evergreen Runtime."
+            exit 1
+          fi
+          echo "Bundled WebView2 runtime found: $(du -sh publish/WebView2 | cut -f1)"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile installer
+        shell: cmd
+        run: >
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          /DMyAppVersion=${{ steps.version.outputs.version }}
+          installer\setup.iss
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/Output/MozartBrowser-Setup-${{ steps.version.outputs.version }}.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
