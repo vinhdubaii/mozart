@@ -81,7 +81,7 @@ namespace MozartBrowser.Windows
             App.Bridge.Attach(tab.WebView.CoreWebView2);
 
             tab.IsNewTabPage = false;
-            MozartBrowser.InternalPages.TryResolveScheme(initialUrl ?? DefaultHomeUrl, out var resolvedUrl);
+            InternalPages.TryResolveScheme(initialUrl ?? DefaultHomeUrl, out var resolvedUrl);
             tab.WebView.CoreWebView2.Navigate(resolvedUrl);
 
             RebuildTabStrip();
@@ -156,7 +156,7 @@ namespace MozartBrowser.Windows
                         OpenInNewTab = url => _ = CreateNewTabAsync(url)
                     };
 
-                    var menu = await MozartBrowser.ContextMenuBuilder.BuildMenuAsync(
+                    var menu = await ContextMenuBuilder.BuildMenuAsync(
                         host, e.ContextMenuTarget, new Point(e.Location.X, e.Location.Y));
 
                     menu.PlacementTarget = tab.WebView;
@@ -308,7 +308,7 @@ namespace MozartBrowser.Windows
         private void NavigateActiveTab(string url)
         {
             if (_activeTab == null) return;
-            MozartBrowser.InternalPages.TryResolveScheme(url, out var resolvedUrl);
+            InternalPages.TryResolveScheme(url, out var resolvedUrl);
             _activeTab.WebView.CoreWebView2.Navigate(resolvedUrl);
         }
 
