@@ -3,6 +3,7 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using MozartBrowser.Models;
+using MozartBrowser.Services.Data;
 
 namespace MozartBrowser.Services.Browser
 {

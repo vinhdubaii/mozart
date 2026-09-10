@@ -11,6 +11,9 @@ using Microsoft.Web.WebView2.Core;
 using MozartBrowser.Models;
 using MozartBrowser.Windows;
 using MozartBrowser.Controls;
+using MozartBrowser.Services.Data;
+using MozartBrowser.Services.Browser;
+using MozartBrowser.Services.Theme;
 
 namespace MozartBrowser.Chrome
 {

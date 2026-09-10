@@ -4,6 +4,7 @@ using System.IO;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 using MozartBrowser.Models;
+using MozartBrowser.Services.Data;
 
 namespace MozartBrowser.Services.Browser
 {
