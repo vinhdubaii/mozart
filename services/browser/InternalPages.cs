@@ -23,6 +23,10 @@ namespace MozartBrowser.Services.Browser
         public static string HistoryUrl => BaseUrl + "history.html";
         public static string DownloadsUrl => BaseUrl + "downloads.html";
         public static string SettingsUrl => BaseUrl + "settings.html";
+        public static string ExtensionsUrl => BaseUrl + "extensions.html";
+
+        /// <summary>Deep-links extensions.html straight to one extension's card — see OnPinnedExtensionClicked.</summary>
+        public static string ExtensionsUrlFor(string extensionId) => $"{ExtensionsUrl}#{extensionId}";
 
         /// <summary>
         /// Folder on disk mapped to VirtualHost. MozartBrowser.csproj copies
@@ -30,7 +34,7 @@ namespace MozartBrowser.Services.Browser
         /// resolves correctly both in dev (bin/Debug/...) and after publish.
         /// </summary>
         public static string FolderPath =>
-            System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", FolderName);
+            System.IO.Path.Combine(AppContext.BaseDirectory, "assets", FolderName);
 
         /// <summary>
         /// Resolves Mozart's own address-bar shortcuts — "mozart://history" and
@@ -64,6 +68,7 @@ namespace MozartBrowser.Services.Browser
                     "history" => HistoryUrl,
                     "downloads" => DownloadsUrl,
                     "settings" => SettingsUrl,
+                    "extensions" => ExtensionsUrl,
                     _ => NewTabUrl
                 };
                 return true;

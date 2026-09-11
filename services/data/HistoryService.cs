@@ -131,6 +131,53 @@ namespace MozartBrowser.Services.Data
             return results;
         }
 
+        /// <summary>Case-insensitive substring match against url/title, most recent first. Powers history.html's search box.</summary>
+        public async Task<List<HistoryItem>> SearchAsync(string query, int limit = 200)
+        {
+            var results = new List<HistoryItem>();
+
+            using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT id, url, title, favicon_url, visited_at
+                FROM history
+                WHERE url LIKE $pattern OR title LIKE $pattern
+                ORDER BY visited_at DESC
+                LIMIT $limit;
+            """;
+            cmd.Parameters.AddWithValue("$pattern", $"%{query}%");
+            cmd.Parameters.AddWithValue("$limit", limit);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                results.Add(new HistoryItem
+                {
+                    Id = reader.GetInt32(0),
+                    Url = reader.GetString(1),
+                    Title = reader.GetString(2),
+                    FaviconUrl = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    VisitedAt = DateTime.Parse(reader.GetString(4))
+                });
+            }
+
+            return results;
+        }
+
+        /// <summary>Deletes a single visit row. Powers the per-row delete button in history.html.</summary>
+        public async Task DeleteAsync(int id)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE FROM history WHERE id = $id;";
+            cmd.Parameters.AddWithValue("$id", id);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         public async Task ClearAsync()
         {
             using var conn = new SqliteConnection(_connectionString);

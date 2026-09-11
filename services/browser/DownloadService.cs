@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 using MozartBrowser.Models;
@@ -29,6 +30,24 @@ namespace MozartBrowser.Services.Browser
         public void Attach(CoreWebView2 coreWebView2)
         {
             coreWebView2.DownloadStarting += OnDownloadStarting;
+        }
+
+        /// <summary>Removes one entry from the list (does not touch the file on disk). Powers downloads.html's per-row "Remove" action.</summary>
+        public void Remove(string id)
+        {
+            var item = Downloads.FirstOrDefault(d => d.Id == id);
+            if (item != null)
+                App.Current.Dispatcher.Invoke(() => Downloads.Remove(item));
+        }
+
+        /// <summary>Clears every entry that isn't still in progress. Powers downloads.html's "Clear all" action.</summary>
+        public void ClearCompleted()
+        {
+            App.Current.Dispatcher.Invoke(() =>
+            {
+                foreach (var item in Downloads.Where(d => d.State != DownloadState.InProgress).ToList())
+                    Downloads.Remove(item);
+            });
         }
 
         private void OnDownloadStarting(object? sender, CoreWebView2DownloadStartingEventArgs e)

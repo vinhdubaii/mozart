@@ -6,22 +6,124 @@
     <link rel="stylesheet" href="shared/base.css" />
 </head>
 <body>
-    <main style="max-width:720px; margin:40px auto; padding:0 20px;">
-        <h1 style="font-weight:600;">History</h1>
-        <p class="mozart-text-secondary">Full history list (grouped by day, searchable, deletable) lands here next.</p>
-        <p id="bridge-status" class="mozart-text-secondary" style="font-size:12px;">Checking bridge…</p>
+    <main class="mozart-page">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <h1>History</h1>
+            <button id="clear-all-btn" class="mozart-danger">Clear all history</button>
+        </div>
+        <input id="search-box" type="search" placeholder="Search history" style="width:100%; margin-top:12px;" />
+
+        <div id="results" class="mozart-section"></div>
     </main>
 
     <script src="shared/mozart-bridge.js"></script>
+    <script src="shared/mozart-page.js"></script>
     <script>
-        MozartBridge.call("system.ping")
-            .then((r) => {
-                document.getElementById("bridge-status").textContent =
-                    `Bridge OK — Mozart Browser ${r.version} · ${r.time}`;
-            })
-            .catch((err) => {
-                document.getElementById("bridge-status").textContent = `Bridge error: ${err.message}`;
-            });
+        const resultsEl = document.getElementById("results");
+        const searchBox = document.getElementById("search-box");
+        let currentQuery = "";
+
+        function faviconImg(item) {
+            const src = item.faviconUrl || "";
+            return `<img class="mozart-favicon" src="${MozartPage.escapeHtml(src)}"
+                onerror="this.style.visibility='hidden'" alt="" />`;
+        }
+
+        function rowHtml(item) {
+            const title = item.title && item.title.trim() ? item.title : item.url;
+            return `
+                <div class="mozart-row" data-id="${item.id}">
+                    ${faviconImg(item)}
+                    <div class="mozart-row-main">
+                        <a class="mozart-row-title" href="${MozartPage.escapeHtml(item.url)}"
+                           style="text-decoration:none; color:inherit; display:block;">${MozartPage.escapeHtml(title)}</a>
+                        <div class="mozart-row-sub">${MozartPage.escapeHtml(item.url)}</div>
+                    </div>
+                    <div class="mozart-row-sub" style="flex-shrink:0;">${MozartPage.formatTime(item.visitedAt)}</div>
+                    <div class="mozart-row-actions">
+                        <button data-action="delete" data-id="${item.id}" title="Remove from history">✕</button>
+                    </div>
+                </div>`;
+        }
+
+        function render(items) {
+            if (!items.length) {
+                resultsEl.innerHTML = `<div class="mozart-surface mozart-empty">${
+                    currentQuery ? "No matching history." : "No browsing history yet."
+                }</div>`;
+                return;
+            }
+
+            // Group consecutive-by-day, preserving the already-sorted (most recent first) order.
+            let html = "";
+            let lastDay = null;
+            let groupRows = "";
+            const flushGroup = () => {
+                if (groupRows) {
+                    html += `<div class="mozart-section"><h2>${lastDay}</h2><div class="mozart-surface mozart-list">${groupRows}</div></div>`;
+                }
+            };
+            for (const item of items) {
+                const day = MozartPage.formatDayLabel(item.visitedAt);
+                if (day !== lastDay) {
+                    flushGroup();
+                    groupRows = "";
+                    lastDay = day;
+                }
+                groupRows += rowHtml(item);
+            }
+            flushGroup();
+            resultsEl.innerHTML = html;
+        }
+
+        async function load() {
+            resultsEl.innerHTML = `<p class="mozart-text-secondary">Loading…</p>`;
+            try {
+                const items = currentQuery
+                    ? await MozartBridge.call("history.search", { query: currentQuery, limit: 300 })
+                    : await MozartBridge.call("history.getRecent", { limit: 300 });
+                render(items);
+            } catch (err) {
+                resultsEl.innerHTML = `<p class="mozart-text-secondary">Couldn't load history: ${MozartPage.escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        resultsEl.addEventListener("click", async (e) => {
+            const btn = e.target.closest("button[data-action='delete']");
+            if (!btn) return;
+            const id = Number(btn.dataset.id);
+            btn.disabled = true;
+            try {
+                await MozartBridge.call("history.delete", { id });
+                btn.closest(".mozart-row")?.remove();
+            } catch (err) {
+                MozartPage.toast(`Couldn't delete: ${err.message}`);
+                btn.disabled = false;
+            }
+        });
+
+        let searchDebounce = null;
+        searchBox.addEventListener("input", () => {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(() => {
+                currentQuery = searchBox.value.trim();
+                load();
+            }, 200);
+        });
+
+        document.getElementById("clear-all-btn").addEventListener("click", async () => {
+            if (!confirm("Clear your entire browsing history? This can't be undone.")) return;
+            try {
+                await MozartBridge.call("history.clear");
+                currentQuery = "";
+                searchBox.value = "";
+                load();
+            } catch (err) {
+                MozartPage.toast(`Couldn't clear history: ${err.message}`);
+            }
+        });
+
+        load();
     </script>
 </body>
 </html>

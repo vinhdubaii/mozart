@@ -6,22 +6,283 @@
     <link rel="stylesheet" href="shared/base.css" />
 </head>
 <body>
-    <main style="max-width:720px; margin:40px auto; padding:0 20px;">
-        <h1 style="font-weight:600;">Settings</h1>
-        <p class="mozart-text-secondary">Search engine, appearance, privacy, downloads, about, etc. land here next.</p>
-        <p id="bridge-status" class="mozart-text-secondary" style="font-size:12px;">Checking bridge…</p>
+    <main class="mozart-page">
+        <h1>Settings</h1>
+        <p id="save-status" class="mozart-text-secondary" style="font-size:12px; min-height:16px;"></p>
+
+        <section class="mozart-section">
+            <h2>General</h2>
+            <div class="mozart-surface" style="padding:0 14px;">
+                <div class="mozart-field">
+                    <div>
+                        <div class="mozart-field-label">Homepage</div>
+                        <div class="mozart-field-hint">Shown when you click the home button.</div>
+                    </div>
+                    <input id="homepage-url" type="text" style="width:260px;" />
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Search engine</div>
+                    <select id="search-engine"></select>
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">On startup</div>
+                    <select id="startup-mode">
+                        <option value="0">Open the New Tab page</option>
+                        <option value="1">Continue where you left off</option>
+                        <option value="3">Continue, plus a new tab</option>
+                        <option value="2">Open specific pages</option>
+                    </select>
+                </div>
+                <div id="startup-pages-field" class="mozart-field" style="display:none; flex-direction:column; align-items:stretch;">
+                    <div class="mozart-field-label" style="margin-bottom:6px;">Pages to open (one URL per line)</div>
+                    <textarea id="startup-pages" rows="3" style="font-family:inherit; font-size:13px; padding:6px 10px; border-radius:6px; border:1px solid var(--mozart-border); background:var(--mozart-surface); color:var(--mozart-text-primary);"></textarea>
+                </div>
+            </div>
+        </section>
+
+        <section class="mozart-section">
+            <h2>Appearance</h2>
+            <div class="mozart-surface" style="padding:0 14px;">
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Theme</div>
+                    <select id="theme">
+                        <option value="0">Match system</option>
+                        <option value="1">Light</option>
+                        <option value="2">Dark</option>
+                    </select>
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Show bookmarks bar</div>
+                    <label class="mozart-switch"><input id="show-bookmark-bar" type="checkbox" /><span></span></label>
+                </div>
+            </div>
+        </section>
+
+        <section class="mozart-section">
+            <h2>Privacy &amp; security</h2>
+            <div class="mozart-surface" style="padding:0 14px;">
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Secure DNS</div>
+                    <select id="secure-dns-mode">
+                        <option value="0">Off</option>
+                        <option value="1">Automatic</option>
+                        <option value="2">Custom</option>
+                    </select>
+                </div>
+                <div id="secure-dns-provider-field" class="mozart-field" style="display:none;">
+                    <div class="mozart-field-label">Provider</div>
+                    <select id="secure-dns-provider">
+                        <option value="cloudflare">Cloudflare</option>
+                        <option value="google">Google</option>
+                        <option value="quad9">Quad9</option>
+                        <option value="cleanbrowsing">CleanBrowsing (family filter)</option>
+                    </select>
+                </div>
+                <div id="secure-dns-custom-field" class="mozart-field" style="display:none;">
+                    <div class="mozart-field-label">DoH template URL</div>
+                    <input id="secure-dns-custom" type="text" style="width:260px;" placeholder="https://…/dns-query" />
+                </div>
+                <div class="mozart-field">
+                    <div>
+                        <div class="mozart-field-label">Offer to save passwords</div>
+                    </div>
+                    <label class="mozart-switch"><input id="offer-save-passwords" type="checkbox" /><span></span></label>
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Autofill saved passwords</div>
+                    <label class="mozart-switch"><input id="autofill-passwords" type="checkbox" /><span></span></label>
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Manage saved passwords</div>
+                    <button id="open-password-manager">Open Password Manager</button>
+                </div>
+                <div class="mozart-field">
+                    <div>
+                        <div class="mozart-field-label">Clear cookies and cache on close</div>
+                    </div>
+                    <label class="mozart-switch"><input id="clear-on-close" type="checkbox" /><span></span></label>
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Browsing data</div>
+                    <button id="open-clear-data" class="mozart-danger">Clear browsing data…</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="mozart-section">
+            <h2>Downloads</h2>
+            <div class="mozart-surface" style="padding:0 14px;">
+                <div class="mozart-field">
+                    <div>
+                        <div class="mozart-field-label">Location</div>
+                        <div id="downloads-location" class="mozart-field-hint"></div>
+                    </div>
+                    <button id="change-downloads-folder">Change…</button>
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Ask where to save each file</div>
+                    <label class="mozart-switch"><input id="ask-where-to-save" type="checkbox" /><span></span></label>
+                </div>
+                <div class="mozart-field">
+                    <div class="mozart-field-label">Show downloads when done</div>
+                    <label class="mozart-switch"><input id="show-downloads-done" type="checkbox" /><span></span></label>
+                </div>
+            </div>
+        </section>
+
+        <section class="mozart-section">
+            <h2>Default browser</h2>
+            <div class="mozart-surface" style="padding:0 14px;">
+                <div class="mozart-field">
+                    <div id="default-browser-status" class="mozart-field-label">Checking…</div>
+                    <button id="make-default-browser">Make default…</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="mozart-section">
+            <h2>About</h2>
+            <div class="mozart-surface" style="padding:0 14px;">
+                <div class="mozart-field">
+                    <div id="about-version" class="mozart-field-label">Mozart Browser</div>
+                    <button id="check-for-update">Check for updates</button>
+                </div>
+            </div>
+        </section>
     </main>
 
     <script src="shared/mozart-bridge.js"></script>
+    <script src="shared/mozart-page.js"></script>
     <script>
-        MozartBridge.call("system.ping")
-            .then((r) => {
-                document.getElementById("bridge-status").textContent =
-                    `Bridge OK — Mozart Browser ${r.version} · ${r.time}`;
-            })
-            .catch((err) => {
-                document.getElementById("bridge-status").textContent = `Bridge error: ${err.message}`;
+        let settings = null;
+        const $ = (id) => document.getElementById(id);
+        const statusEl = $("save-status");
+
+        function populateForm() {
+            $("homepage-url").value = settings.homepageUrl;
+
+            const engineSelect = $("search-engine");
+            engineSelect.innerHTML = settings.searchEngines
+                .map((e) => `<option value="${MozartPage.escapeHtml(e.name)}">${MozartPage.escapeHtml(e.name)}</option>`)
+                .join("");
+            engineSelect.value = settings.defaultSearchEngineName;
+
+            $("startup-mode").value = String(settings.startup.mode);
+            $("startup-pages").value = (settings.startup.pages || []).join("\n");
+            $("startup-pages-field").style.display = settings.startup.mode === 2 ? "flex" : "none";
+
+            $("theme").value = String(settings.theme);
+            $("show-bookmark-bar").checked = settings.showBookmarkBar;
+
+            $("secure-dns-mode").value = String(settings.secureDns.mode);
+            $("secure-dns-provider").value = settings.secureDns.provider;
+            $("secure-dns-custom").value = settings.secureDns.customTemplate || "";
+            $("secure-dns-provider-field").style.display = settings.secureDns.mode === 1 ? "flex" : "none";
+            $("secure-dns-custom-field").style.display = settings.secureDns.mode === 2 ? "flex" : "none";
+
+            $("offer-save-passwords").checked = settings.passwordManager.offerToSavePasswords;
+            $("autofill-passwords").checked = settings.passwordManager.autofillEnabled;
+            $("clear-on-close").checked = settings.clearOnClose.enabled;
+
+            $("downloads-location").textContent = settings.downloads.location;
+            $("ask-where-to-save").checked = settings.downloads.askWhereToSaveEachFile;
+            $("show-downloads-done").checked = settings.downloads.showDownloadsWhenDone;
+        }
+
+        let saveTimer = null;
+        function scheduleSave(immediate) {
+            statusEl.textContent = "Saving…";
+            clearTimeout(saveTimer);
+            const doSave = async () => {
+                try {
+                    await MozartBridge.call("settings.save", settings);
+                    statusEl.textContent = "Saved";
+                    setTimeout(() => { if (statusEl.textContent === "Saved") statusEl.textContent = ""; }, 1500);
+                } catch (err) {
+                    statusEl.textContent = `Couldn't save: ${err.message}`;
+                }
+            };
+            if (immediate) doSave();
+            else saveTimer = setTimeout(doSave, 400);
+        }
+
+        function bindImmediate(id, apply) {
+            $(id).addEventListener("change", () => { apply(); populateForm(); scheduleSave(true); });
+        }
+
+        async function init() {
+            settings = await MozartBridge.call("settings.get");
+            populateForm();
+
+            $("homepage-url").addEventListener("input", () => {
+                settings.homepageUrl = $("homepage-url").value;
+                scheduleSave(false);
             });
+            bindImmediate("search-engine", () => { settings.defaultSearchEngineName = $("search-engine").value; });
+            bindImmediate("startup-mode", () => { settings.startup.mode = Number($("startup-mode").value); });
+            $("startup-pages").addEventListener("input", () => {
+                settings.startup.pages = $("startup-pages").value.split("\n").map((s) => s.trim()).filter(Boolean);
+                scheduleSave(false);
+            });
+            bindImmediate("theme", () => { settings.theme = Number($("theme").value); });
+            bindImmediate("show-bookmark-bar", () => { settings.showBookmarkBar = $("show-bookmark-bar").checked; });
+            bindImmediate("secure-dns-mode", () => { settings.secureDns.mode = Number($("secure-dns-mode").value); });
+            bindImmediate("secure-dns-provider", () => { settings.secureDns.provider = $("secure-dns-provider").value; });
+            $("secure-dns-custom").addEventListener("input", () => {
+                settings.secureDns.customTemplate = $("secure-dns-custom").value;
+                scheduleSave(false);
+            });
+            bindImmediate("offer-save-passwords", () => { settings.passwordManager.offerToSavePasswords = $("offer-save-passwords").checked; });
+            bindImmediate("autofill-passwords", () => { settings.passwordManager.autofillEnabled = $("autofill-passwords").checked; });
+            bindImmediate("clear-on-close", () => { settings.clearOnClose.enabled = $("clear-on-close").checked; });
+            bindImmediate("ask-where-to-save", () => { settings.downloads.askWhereToSaveEachFile = $("ask-where-to-save").checked; });
+            bindImmediate("show-downloads-done", () => { settings.downloads.showDownloadsWhenDone = $("show-downloads-done").checked; });
+
+            $("change-downloads-folder").addEventListener("click", async () => {
+                try {
+                    const r = await MozartBridge.call("settings.pickDownloadsFolder");
+                    if (r && r.path) {
+                        settings.downloads.location = r.path;
+                        populateForm();
+                        scheduleSave(true);
+                    }
+                } catch (err) {
+                    MozartPage.toast(`Couldn't change folder: ${err.message}`);
+                }
+            });
+
+            $("open-password-manager").addEventListener("click", () => MozartBridge.call("settings.openPasswordManager"));
+            $("open-clear-data").addEventListener("click", () => MozartBridge.call("settings.openClearBrowsingData"));
+
+            try {
+                const r = await MozartBridge.call("settings.checkDefaultBrowser");
+                $("default-browser-status").textContent = r.isDefault
+                    ? "Mozart is your default browser."
+                    : "Mozart is not your default browser.";
+                $("make-default-browser").style.display = r.isDefault ? "none" : "inline-block";
+            } catch {
+                $("default-browser-status").textContent = "Couldn't check default browser status.";
+            }
+            $("make-default-browser").addEventListener("click", () => MozartBridge.call("settings.openDefaultBrowserSettings"));
+
+            const ping = await MozartBridge.call("system.ping");
+            $("about-version").textContent = `Mozart Browser ${ping.version}`;
+            $("check-for-update").addEventListener("click", async () => {
+                $("check-for-update").disabled = true;
+                $("check-for-update").textContent = "Checking…";
+                try {
+                    const info = await MozartBridge.call("settings.checkForUpdate");
+                    $("check-for-update").textContent = info ? `Update available: v${info.version}` : "Up to date";
+                } catch (err) {
+                    $("check-for-update").textContent = "Check for updates";
+                    MozartPage.toast(`Couldn't check for updates: ${err.message}`);
+                } finally {
+                    $("check-for-update").disabled = false;
+                }
+            });
+        }
+
+        init();
     </script>
 </body>
 </html>

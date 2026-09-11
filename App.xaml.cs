@@ -1,9 +1,13 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using MozartBrowser.Chrome;
+using MozartBrowser.Models;
 using MozartBrowser.Services.Data;
 using MozartBrowser.Services.Browser;
 using MozartBrowser.Services.Theme;
@@ -132,12 +136,18 @@ namespace MozartBrowser
             }
         }
 
+        /// <summary>Case-insensitive so payload.save can hand back camelCase JSON keys and land on this app's PascalCase AppSettings properties.</summary>
+        private static readonly JsonSerializerOptions BridgeDeserializeOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
         /// <summary>
         /// Registers every action Mozart's internal HTML pages (New Tab,
-        /// History, Downloads, Settings) can call through App.Bridge. Real
-        /// history/downloads/settings actions are added as each of those
-        /// pages gets built; for now this just proves the request/response
-        /// round trip works end to end.
+        /// History, Downloads, Settings, Extensions) can call through
+        /// App.Bridge. Window-specific actions that need a live MainWindow
+        /// (e.g. anchoring a native dialog) are registered separately by
+        /// MainWindow itself — see MainWindow.RegisterWindowBridgeHandlers.
         /// </summary>
         private static void RegisterBridgeHandlers()
         {
@@ -145,8 +155,126 @@ namespace MozartBrowser
             {
                 message = "pong",
                 time = DateTime.UtcNow,
-                version = Updates.CurrentVersion
+                version = Updates.CurrentVersion.ToString()
             }));
+
+            // ---- History ----
+            Bridge.RegisterHandler("history.getRecent", async payload =>
+            {
+                var limit = payload.ValueKind == JsonValueKind.Object && payload.TryGetProperty("limit", out var l) ? l.GetInt32() : 200;
+                return (object?)await History.GetRecentAsync(limit);
+            });
+            Bridge.RegisterHandler("history.search", async payload =>
+            {
+                var query = payload.GetProperty("query").GetString() ?? string.Empty;
+                var limit = payload.TryGetProperty("limit", out var l) ? l.GetInt32() : 200;
+                return (object?)await History.SearchAsync(query, limit);
+            });
+            Bridge.RegisterHandler("history.delete", async payload =>
+            {
+                await History.DeleteAsync(payload.GetProperty("id").GetInt32());
+                return null;
+            });
+            Bridge.RegisterHandler("history.clear", async _ =>
+            {
+                await History.ClearAsync();
+                return null;
+            });
+
+            // ---- Downloads ----
+            Bridge.RegisterHandler("downloads.getAll", _ =>
+                Task.FromResult<object?>(Downloads.Downloads.ToList()));
+            Bridge.RegisterHandler("downloads.open", payload =>
+            {
+                var item = Downloads.Downloads.FirstOrDefault(d => d.Id == payload.GetProperty("id").GetString());
+                if (item != null && File.Exists(item.FilePath))
+                    Process.Start(new ProcessStartInfo(item.FilePath) { UseShellExecute = true });
+                return Task.FromResult<object?>(null);
+            });
+            Bridge.RegisterHandler("downloads.showInFolder", payload =>
+            {
+                var item = Downloads.Downloads.FirstOrDefault(d => d.Id == payload.GetProperty("id").GetString());
+                if (item != null && File.Exists(item.FilePath))
+                    Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{item.FilePath}\"") { UseShellExecute = true });
+                return Task.FromResult<object?>(null);
+            });
+            Bridge.RegisterHandler("downloads.remove", payload =>
+            {
+                Downloads.Remove(payload.GetProperty("id").GetString() ?? string.Empty);
+                return Task.FromResult<object?>(null);
+            });
+            Bridge.RegisterHandler("downloads.clearCompleted", _ =>
+            {
+                Downloads.ClearCompleted();
+                return Task.FromResult<object?>(null);
+            });
+
+            // ---- Extensions ----
+            Bridge.RegisterHandler("extensions.getAll", async _ => (object?)await Extensions.GetInstalledAsync());
+            Bridge.RegisterHandler("extensions.setEnabled", async payload =>
+            {
+                await Extensions.SetEnabledAsync(
+                    payload.GetProperty("id").GetString() ?? string.Empty,
+                    payload.GetProperty("enabled").GetBoolean());
+                return null;
+            });
+            Bridge.RegisterHandler("extensions.remove", async payload =>
+            {
+                await Extensions.RemoveAsync(payload.GetProperty("id").GetString() ?? string.Empty);
+                return null;
+            });
+            Bridge.RegisterHandler("extensions.loadUnpacked", async _ =>
+            {
+                string? folder = null;
+                Current.Dispatcher.Invoke(() =>
+                {
+                    using var dialog = new System.Windows.Forms.FolderBrowserDialog
+                    {
+                        Description = "Select the unpacked extension's folder (containing manifest.json)"
+                    };
+                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        folder = dialog.SelectedPath;
+                });
+                // User cancelled the picker — not an error, just nothing to install.
+                if (folder == null) return null;
+                return (object?)await Extensions.LoadUnpackedAsync(folder);
+            });
+
+            // ---- Settings ----
+            Bridge.RegisterHandler("settings.get", _ => Task.FromResult<object?>(Settings.Current));
+            Bridge.RegisterHandler("settings.save", async payload =>
+            {
+                var updated = JsonSerializer.Deserialize<AppSettings>(payload.GetRawText(), BridgeDeserializeOptions)
+                    ?? throw new InvalidOperationException("settings.save received an empty/invalid settings object.");
+                await Settings.ReplaceCurrentAsync(updated);
+                return null;
+            });
+            Bridge.RegisterHandler("settings.pickDownloadsFolder", _ =>
+            {
+                string? folder = null;
+                Current.Dispatcher.Invoke(() =>
+                {
+                    using var dialog = new System.Windows.Forms.FolderBrowserDialog
+                    {
+                        Description = "Choose where downloads are saved",
+                        SelectedPath = Settings.Current.Downloads.Location
+                    };
+                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                        folder = dialog.SelectedPath;
+                });
+                return Task.FromResult<object?>(folder == null ? null : new { path = folder });
+            });
+            Bridge.RegisterHandler("settings.checkDefaultBrowser", _ =>
+                Task.FromResult<object?>(new { isDefault = DefaultBrowserService.IsDefaultBrowser() }));
+            Bridge.RegisterHandler("settings.openDefaultBrowserSettings", _ =>
+            {
+                // Windows doesn't allow programmatically setting the default
+                // browser (deliberately, to stop silent hijacking) — this is
+                // the same "open the OS picker" fallback SettingsWindow used.
+                DefaultBrowserService.OpenDefaultAppsSettings();
+                return Task.FromResult<object?>(null);
+            });
+            Bridge.RegisterHandler("settings.checkForUpdate", async _ => (object?)await Updates.CheckForUpdateAsync());
         }
 
         /// <summary>

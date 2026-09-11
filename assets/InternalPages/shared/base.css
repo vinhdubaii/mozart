@@ -95,3 +95,215 @@ input[type="text"], input[type="search"] {
     border-radius: 6px;
     padding: 6px 10px;
 }
+
+/* ---- shared primitives for the fuller pages (Settings/History/Downloads/Extensions) ---- */
+
+select {
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--mozart-surface);
+    color: var(--mozart-text-primary);
+    border: 1px solid var(--mozart-border);
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+
+.mozart-page {
+    max-width: 720px;
+    margin: 32px auto 80px;
+    padding: 0 20px;
+}
+
+.mozart-page h1 {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.mozart-section {
+    margin-top: 28px;
+}
+
+.mozart-section h2 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--mozart-text-secondary);
+    margin: 0 0 8px;
+}
+
+.mozart-list {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mozart-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--mozart-border);
+}
+
+.mozart-row:last-child {
+    border-bottom: none;
+}
+
+.mozart-row-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.mozart-row-title {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mozart-row-sub {
+    font-size: 12px;
+    color: var(--mozart-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mozart-row-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.mozart-empty {
+    padding: 24px 14px;
+    text-align: center;
+    color: var(--mozart-text-secondary);
+    font-size: 13px;
+}
+
+.mozart-favicon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border-radius: 3px;
+    background: var(--mozart-surface-alt);
+}
+
+.mozart-icon-img {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    background: var(--mozart-surface-alt);
+    object-fit: contain;
+}
+
+button.mozart-danger {
+    background: transparent;
+    border-color: var(--mozart-danger);
+    color: var(--mozart-danger);
+}
+
+button:disabled {
+    opacity: .5;
+    cursor: default;
+    filter: none;
+}
+
+/* Toggle switch: <label class="mozart-switch"><input type="checkbox"><span></span></label> */
+.mozart-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.mozart-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.mozart-switch span {
+    position: absolute;
+    inset: 0;
+    background: var(--mozart-surface-alt);
+    border: 1px solid var(--mozart-border);
+    border-radius: 999px;
+    transition: background .15s;
+}
+
+.mozart-switch span::before {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    left: 2px;
+    top: 2px;
+    background: var(--mozart-surface);
+    border-radius: 50%;
+    transition: transform .15s;
+}
+
+.mozart-switch input:checked + span {
+    background: var(--mozart-accent);
+    border-color: var(--mozart-accent);
+}
+
+.mozart-switch input:checked + span::before {
+    transform: translateX(16px);
+    background: #fff;
+}
+
+.mozart-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.mozart-field-label {
+    font-size: 13px;
+}
+
+.mozart-field-hint {
+    font-size: 12px;
+    color: var(--mozart-text-secondary);
+    margin-top: 2px;
+}
+
+.mozart-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--mozart-surface-alt);
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.mozart-progress > div {
+    height: 100%;
+    background: var(--mozart-accent);
+}
+
+.mozart-toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--mozart-text-primary);
+    color: var(--mozart-chrome-bg);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+}
+
+.mozart-toast.mozart-toast-visible {
+    opacity: 1;
+}

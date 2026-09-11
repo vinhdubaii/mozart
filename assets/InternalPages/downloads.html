@@ -6,22 +6,102 @@
     <link rel="stylesheet" href="shared/base.css" />
 </head>
 <body>
-    <main style="max-width:720px; margin:40px auto; padding:0 20px;">
-        <h1 style="font-weight:600;">Downloads</h1>
-        <p class="mozart-text-secondary">Live download list with progress, Open / Show in folder lands here next.</p>
-        <p id="bridge-status" class="mozart-text-secondary" style="font-size:12px;">Checking bridge…</p>
+    <main class="mozart-page">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <h1>Downloads</h1>
+            <button id="clear-btn" class="mozart-danger">Clear finished</button>
+        </div>
+        <div id="results" class="mozart-section"></div>
     </main>
 
     <script src="shared/mozart-bridge.js"></script>
+    <script src="shared/mozart-page.js"></script>
     <script>
-        MozartBridge.call("system.ping")
-            .then((r) => {
-                document.getElementById("bridge-status").textContent =
-                    `Bridge OK — Mozart Browser ${r.version} · ${r.time}`;
-            })
-            .catch((err) => {
-                document.getElementById("bridge-status").textContent = `Bridge error: ${err.message}`;
-            });
+        const resultsEl = document.getElementById("results");
+        const STATE = { 0: "InProgress", 1: "Completed", 2: "Failed", 3: "Cancelled" };
+        let pollTimer = null;
+
+        function rowHtml(item) {
+            const state = STATE[item.state] ?? "Completed";
+            const sizeLine = item.totalBytes
+                ? `${MozartPage.formatBytes(item.receivedBytes)} of ${MozartPage.formatBytes(item.totalBytes)}`
+                : MozartPage.formatBytes(item.receivedBytes);
+
+            let sub, actions;
+            if (state === "InProgress") {
+                sub = `${sizeLine}<div class="mozart-progress"><div style="width:${item.progressPercent.toFixed(0)}%"></div></div>`;
+                actions = "";
+            } else if (state === "Failed" || state === "Cancelled") {
+                sub = `${state === "Failed" ? "Failed" : "Cancelled"} · ${sizeLine}`;
+                actions = `<button data-action="remove" data-id="${item.id}">Remove</button>`;
+            } else {
+                sub = `${MozartPage.formatBytes(item.totalBytes)} · ${new Date(item.startTime).toLocaleString()}`;
+                actions = `
+                    <button data-action="open" data-id="${item.id}">Open</button>
+                    <button data-action="folder" data-id="${item.id}">Show in folder</button>
+                    <button data-action="remove" data-id="${item.id}" title="Remove from list">✕</button>`;
+            }
+
+            return `
+                <div class="mozart-row" data-id="${item.id}">
+                    <div class="mozart-icon-img"></div>
+                    <div class="mozart-row-main">
+                        <div class="mozart-row-title">${MozartPage.escapeHtml(item.fileName)}</div>
+                        <div class="mozart-row-sub">${sub}</div>
+                    </div>
+                    <div class="mozart-row-actions">${actions}</div>
+                </div>`;
+        }
+
+        function render(items) {
+            if (!items.length) {
+                resultsEl.innerHTML = `<div class="mozart-surface mozart-empty">No downloads yet.</div>`;
+                return;
+            }
+            // Most recently started first.
+            const sorted = [...items].sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+            resultsEl.innerHTML = `<div class="mozart-surface mozart-list">${sorted.map(rowHtml).join("")}</div>`;
+            return sorted.some((i) => i.state === 0); // true if anything is still in progress
+        }
+
+        async function load() {
+            try {
+                const items = await MozartBridge.call("downloads.getAll");
+                const stillActive = render(items);
+                clearTimeout(pollTimer);
+                if (stillActive) pollTimer = setTimeout(load, 700);
+            } catch (err) {
+                resultsEl.innerHTML = `<p class="mozart-text-secondary">Couldn't load downloads: ${MozartPage.escapeHtml(err.message)}</p>`;
+            }
+        }
+
+        resultsEl.addEventListener("click", async (e) => {
+            const btn = e.target.closest("button[data-action]");
+            if (!btn) return;
+            const id = btn.dataset.id;
+            const action = btn.dataset.action;
+            try {
+                if (action === "open") await MozartBridge.call("downloads.open", { id });
+                else if (action === "folder") await MozartBridge.call("downloads.showInFolder", { id });
+                else if (action === "remove") {
+                    await MozartBridge.call("downloads.remove", { id });
+                    btn.closest(".mozart-row")?.remove();
+                }
+            } catch (err) {
+                MozartPage.toast(`Couldn't complete that: ${err.message}`);
+            }
+        });
+
+        document.getElementById("clear-btn").addEventListener("click", async () => {
+            try {
+                await MozartBridge.call("downloads.clearCompleted");
+                load();
+            } catch (err) {
+                MozartPage.toast(`Couldn't clear the list: ${err.message}`);
+            }
+        });
+
+        load();
     </script>
 </body>
 </html>

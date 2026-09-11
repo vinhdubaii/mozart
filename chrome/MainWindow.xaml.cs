@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Web.WebView2.Core;
 using MozartBrowser.Models;
+using MozartBrowser.Dialogs;
 using MozartBrowser.Windows;
 using MozartBrowser.Controls;
 using MozartBrowser.Services.Data;
@@ -71,6 +72,19 @@ namespace MozartBrowser.Chrome
             App.Extensions.SetProfileResolver(ResolveExtensionProfile);
             App.Extensions.ExtensionRemoved += (_, _) => RebuildPinnedExtensionIcons();
             ApplyCustomThemeBackground();
+
+            // settings.html now owns saving (see App.RegisterBridgeHandlers'
+            // "settings.save" action) instead of the old native SettingsWindow
+            // calling ApplyCustomThemeBackground()/RebuildBookmarkBar() itself
+            // right after ShowDialog() returned. Fires on every save
+            // (including unrelated ones, e.g. window size) - both methods are
+            // cheap no-ops when nothing relevant changed, so that's fine.
+            App.Settings.Saved += () => Dispatcher.Invoke(() =>
+            {
+                ApplyCustomThemeBackground();
+                RebuildBookmarkBar();
+            });
+            RegisterWindowBridgeHandlers();
 
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             PreviewMouseWheel += MainWindow_PreviewMouseWheel;
@@ -704,13 +718,44 @@ namespace MozartBrowser.Chrome
                 OpenSettingsToExtensions(ext.Id);
         }
 
+        /// <summary>
+        /// Extensions is its own internal page now (mozart://extensions), not
+        /// a panel inside Settings — see REWRITE_PLAN §6. Deep-links straight
+        /// to one extension's card via InternalPages.ExtensionsUrlFor when a
+        /// specific extension triggered this (pinned-icon click).
+        /// </summary>
         private void OpenSettingsToExtensions(string? highlightExtensionId = null)
         {
-            var currentUrls = Tabs.Select(t => t.IsNewTabPage ? "about:newtab" : t.Url).ToList();
-            var settingsWindow = new SettingsWindow(_activeTab?.WebView.CoreWebView2?.Profile, currentUrls) { Owner = this };
-            settingsWindow.SelectExtensionsPanel(highlightExtensionId);
-            if (settingsWindow.ShowDialog() == true)
-                ApplyCustomThemeBackground();
+            var url = highlightExtensionId != null
+                ? InternalPages.ExtensionsUrlFor(highlightExtensionId)
+                : InternalPages.ExtensionsUrl;
+            _ = CreateNewTabAsync(url);
+        }
+
+        /// <summary>
+        /// Registers bridge actions that need this specific MainWindow — to
+        /// anchor a native dialog (Owner=this) or read the currently-active
+        /// tab's profile — rather than App-level services alone. Called once
+        /// from the constructor; App.RegisterBridgeHandlers covers everything
+        /// that doesn't need a window.
+        /// </summary>
+        private void RegisterWindowBridgeHandlers()
+        {
+            App.Bridge.RegisterHandler("settings.openClearBrowsingData", _ =>
+            {
+                var profile = _activeTab?.WebView.CoreWebView2?.Profile;
+                if (profile != null)
+                {
+                    Dispatcher.Invoke(() => new DeleteBrowsingDataDialog(profile) { Owner = this }.ShowDialog());
+                }
+                return System.Threading.Tasks.Task.FromResult<object?>(null);
+            });
+
+            App.Bridge.RegisterHandler("settings.openPasswordManager", _ =>
+            {
+                Dispatcher.Invoke(() => new PasswordManagerWindow { Owner = this }.Show());
+                return System.Threading.Tasks.Task.FromResult<object?>(null);
+            });
         }
 
         // ============================= Hamburger menu (☰) =============================
@@ -739,13 +784,7 @@ namespace MozartBrowser.Chrome
             menu.Items.Add(MenuItem("Print...", "Ctrl+P", (_, _) => _activeTab?.WebView.CoreWebView2.ShowPrintUI()));
             menu.Items.Add(new Separator());
 
-            menu.Items.Add(MenuItem("Settings", null, (_, _) =>
-            {
-                var currentUrls = Tabs.Select(t => t.IsNewTabPage ? "about:newtab" : t.Url).ToList();
-                var settingsWindow = new SettingsWindow(_activeTab?.WebView.CoreWebView2?.Profile, currentUrls) { Owner = this };
-                if (settingsWindow.ShowDialog() == true)
-                    ApplyCustomThemeBackground();
-            }));
+            menu.Items.Add(MenuItem("Settings", null, (_, _) => _ = CreateNewTabAsync(InternalPages.SettingsUrl)));
             menu.Items.Add(MenuItem("About Mozart Browser", null, (_, _) => ShowAbout()));
             menu.Items.Add(new Separator());
 

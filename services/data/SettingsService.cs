@@ -23,9 +23,32 @@ namespace MozartBrowser.Services.Data
 
         public AppSettings Current { get; private set; } = new();
 
+        /// <summary>
+        /// Raised after every successful SaveAsync. Lets UI that doesn't own
+        /// the settings object (MainWindow reacting to changes made from
+        /// settings.html via the bridge, rather than its own native dialogs)
+        /// know it should re-apply theme/bookmark-bar/etc. Fires on every
+        /// save, including unrelated ones (window size, last-session tabs),
+        /// so subscribers should be cheap and idempotent.
+        /// </summary>
+        public event Action? Saved;
+
         public SettingsService(string filePath)
         {
             _filePath = filePath;
+        }
+
+        /// <summary>
+        /// Wholesale-replaces Current, then saves. Used by the settings.save
+        /// bridge action: settings.html always sends back the full settings
+        /// object (not a partial patch), so there's nothing to merge field by
+        /// field - this just swaps the in-memory object being read everywhere
+        /// else (App.Settings.Current) and persists it the normal way.
+        /// </summary>
+        public async Task ReplaceCurrentAsync(AppSettings updated)
+        {
+            Current = updated;
+            await SaveAsync();
         }
 
         public async Task LoadAsync()
@@ -63,6 +86,7 @@ namespace MozartBrowser.Services.Data
 
                 var json = JsonSerializer.Serialize(Current, JsonOptions);
                 await File.WriteAllTextAsync(_filePath, json).ConfigureAwait(false);
+                Saved?.Invoke();
             }
             catch (Exception ex)
             {

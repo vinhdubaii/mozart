@@ -107,6 +107,37 @@ namespace MozartBrowser.Services.Browser
             return parsed;
         }
 
+        /// <summary>
+        /// Dev-mode style install straight from an already-unpacked folder on
+        /// disk (Chrome's "Load unpacked") — no store, no .crx, no download.
+        /// The folder is registered with WebView2 in place, same as
+        /// InstallFromStoreAsync's tail end, just without the fetch/unpack step.
+        /// </summary>
+        public async Task<InstalledExtension> LoadUnpackedAsync(string folderPath)
+        {
+            var profile = ResolveProfile()
+                ?? throw new InvalidOperationException("No active WebView2 profile to install into yet.");
+
+            if (!Directory.Exists(folderPath))
+                throw new DirectoryNotFoundException($"'{folderPath}' does not exist.");
+            if (!File.Exists(Path.Combine(folderPath, "manifest.json")))
+                throw new InvalidOperationException("Selected folder has no manifest.json — not a valid unpacked extension.");
+
+            var liveExtension = await profile.AddBrowserExtensionAsync(folderPath);
+
+            // Unpacked extensions are keyed by their own folder path directly,
+            // same map used for store installs, so RemoveAsync/GetInstalledAsync
+            // don't need to know or care which install path an extension came from.
+            var map = LoadIdMap();
+            map[liveExtension.Id] = folderPath;
+            SaveIdMap(map);
+
+            var parsed = ParseManifest(folderPath, liveExtension.Id, liveExtension.Name)
+                ?? throw new InvalidOperationException("Installed extension has no readable manifest.json.");
+            parsed.IsEnabled = liveExtension.IsEnabled;
+            return parsed;
+        }
+
         public async Task<List<InstalledExtension>> GetInstalledAsync()
         {
             // Cross-reference WebView2's live extension list (for
@@ -155,7 +186,16 @@ namespace MozartBrowser.Services.Browser
 
             var map = LoadIdMap();
             var folder = ResolveFolder(extensionId, map);
-            if (folder != null && Directory.Exists(folder))
+
+            // Only ever delete a folder Mozart itself extracted (store/.crx
+            // installs, always under _extensionsRootFolder). "Load unpacked"
+            // extensions point at whatever folder the user picked - often
+            // their own dev project - so removing the extension must never
+            // touch that folder on disk, just unregister it from WebView2.
+            var isOwnedByMozart = folder != null &&
+                Path.GetFullPath(folder).StartsWith(Path.GetFullPath(_extensionsRootFolder), StringComparison.OrdinalIgnoreCase);
+
+            if (isOwnedByMozart && Directory.Exists(folder))
             {
                 try { Directory.Delete(folder, recursive: true); }
                 catch { /* best-effort, matches CleanupPrivateEnvironment's style */ }
