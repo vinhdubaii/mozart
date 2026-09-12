@@ -171,6 +171,24 @@ namespace MozartBrowser.Services.Data
             return results;
         }
 
+        /// <summary>One saved login by id — used by the passwords.reveal bridge handler right before decrypting for display.</summary>
+        public async Task<SavedPassword?> GetByIdAsync(int id)
+        {
+            using var conn = new SqliteConnection(_connectionString);
+            await conn.OpenAsync();
+
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT id, domain, username, encrypted_password, created_at, updated_at
+                FROM passwords
+                WHERE id = $id;
+            """;
+            cmd.Parameters.AddWithValue("$id", id);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+            return await reader.ReadAsync() ? ReadRow(reader) : null;
+        }
+
         public async Task DeleteAsync(int id)
         {
             using var conn = new SqliteConnection(_connectionString);

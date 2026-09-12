@@ -65,5 +65,23 @@
             .catch((err) => { el.textContent = `Bridge error: ${err.message}`; });
     }
 
-    global.MozartPage = { escapeHtml, formatBytes, formatDayLabel, formatTime, toast, reportBridgeStatus };
+    /** Sets/clears data-theme on <html> — base.css keys its dark-mode variables off this attribute. */
+    function setDarkTheme(isDark) {
+        document.documentElement.dataset.theme = isDark ? "dark" : "light";
+    }
+
+    // Every internal page loads this file, so wiring theme sync here (instead
+    // of once per page) is what makes AppTheme.Dark/Light actually apply to
+    // HTML pages instead of only following the OS's prefers-color-scheme.
+    // Two parts: resolve the current theme once on load (covers the page
+    // being freshly navigated to/reloaded), then listen for the "theme.changed"
+    // push (see App.xaml.cs's settings.save handler) so a tab that's already
+    // open — sitting on Settings or New Tab while the user flips the Theme
+    // dropdown — updates immediately instead of needing a re-navigation.
+    if (global.MozartBridge) {
+        MozartBridge.call("system.getTheme").then((r) => setDarkTheme(r.isDark)).catch(() => {});
+        MozartBridge.on("theme.changed", (payload) => setDarkTheme(payload.isDark));
+    }
+
+    global.MozartPage = { escapeHtml, formatBytes, formatDayLabel, formatTime, toast, reportBridgeStatus, setDarkTheme };
 })(window);

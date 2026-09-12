@@ -18,16 +18,18 @@ namespace MozartBrowser.Services.Theme
         private const string LightUri = "Themes/Light.xaml";
         private const string DarkUri = "Themes/Dark.xaml";
 
+        /// <summary>Resolves System/Light/Dark down to a plain "is dark" bool — shared by Apply() and by the system.getTheme bridge handler that internal HTML pages call.</summary>
+        public static bool ResolveIsDark(AppTheme theme) => theme switch
+        {
+            AppTheme.Dark => true,
+            AppTheme.Light => false,
+            AppTheme.System => IsWindowsInDarkMode(),
+            _ => false
+        };
+
         public static void Apply(AppTheme theme)
         {
-            var resolvedIsDark = theme switch
-            {
-                AppTheme.Dark => true,
-                AppTheme.Light => false,
-                AppTheme.System => IsWindowsInDarkMode(),
-                _ => false
-            };
-
+            var resolvedIsDark = ResolveIsDark(theme);
             var targetUri = resolvedIsDark ? DarkUri : LightUri;
 
             var appResources = System.Windows.Application.Current.Resources;

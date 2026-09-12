@@ -247,8 +247,20 @@ namespace MozartBrowser
                 var updated = JsonSerializer.Deserialize<AppSettings>(payload.GetRawText(), BridgeDeserializeOptions)
                     ?? throw new InvalidOperationException("settings.save received an empty/invalid settings object.");
                 await Settings.ReplaceCurrentAsync(updated);
+
+                // Previously only App startup ever called ThemeService.Apply, so a
+                // theme change made in settings.html sat persisted-but-unapplied
+                // until the next launch. Apply it to the native WPF chrome right
+                // now, and push the resolved value to every open internal HTML
+                // page (they can't see AppTheme.System resolve on their own).
+                var isDark = ThemeService.ResolveIsDark(updated.Theme);
+                Current.Dispatcher.Invoke(() => ThemeService.Apply(updated.Theme));
+                Bridge.BroadcastEvent("theme.changed", new { isDark });
+
                 return null;
             });
+            Bridge.RegisterHandler("system.getTheme", _ =>
+                Task.FromResult<object?>(new { isDark = ThemeService.ResolveIsDark(Settings.Current.Theme) }));
             Bridge.RegisterHandler("settings.pickDownloadsFolder", _ =>
             {
                 string? folder = null;
@@ -275,6 +287,34 @@ namespace MozartBrowser
                 return Task.FromResult<object?>(null);
             });
             Bridge.RegisterHandler("settings.checkForUpdate", async _ => (object?)await Updates.CheckForUpdateAsync());
+
+            // ---- Passwords ----
+            Bridge.RegisterHandler("passwords.getAll", async _ =>
+            {
+                var all = await Passwords.GetAllAsync();
+                // Never send encrypted_password blobs to the page at all -- only
+                // passwords.reveal (below) touches ciphertext, and only for the
+                // one row the user explicitly clicked "Show" on.
+                return (object?)all.Select(p => new
+                {
+                    id = p.Id,
+                    domain = p.Domain,
+                    username = p.Username,
+                    updatedAt = p.UpdatedAt
+                }).ToList();
+            });
+            Bridge.RegisterHandler("passwords.reveal", async payload =>
+            {
+                var id = payload.GetProperty("id").GetInt32();
+                var entry = await Passwords.GetByIdAsync(id)
+                    ?? throw new InvalidOperationException("That saved password no longer exists.");
+                return (object?)new { password = PasswordVaultService.Decrypt(entry.EncryptedPassword) };
+            });
+            Bridge.RegisterHandler("passwords.delete", async payload =>
+            {
+                await Passwords.DeleteAsync(payload.GetProperty("id").GetInt32());
+                return null;
+            });
         }
 
         /// <summary>

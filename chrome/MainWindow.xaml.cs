@@ -753,7 +753,7 @@ namespace MozartBrowser.Chrome
 
             App.Bridge.RegisterHandler("settings.openPasswordManager", _ =>
             {
-                Dispatcher.Invoke(() => new PasswordManagerWindow { Owner = this }.Show());
+                Dispatcher.Invoke(async () => await CreateNewTabAsync(InternalPages.PasswordsUrl));
                 return System.Threading.Tasks.Task.FromResult<object?>(null);
             });
         }

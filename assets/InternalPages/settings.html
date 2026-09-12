@@ -4,152 +4,205 @@
     <meta charset="UTF-8" />
     <title>Settings</title>
     <link rel="stylesheet" href="shared/base.css" />
+    <style>
+        /* Page-specific tweaks that don't belong in the shared stylesheet. */
+        .mozart-page-title { font-size: 20px; font-weight: 500; margin: 0 0 20px; }
+        .mozart-section h2 { display: flex; align-items: center; gap: 8px; }
+        #save-status { min-height: 16px; font-size: 12px; }
+    </style>
 </head>
 <body>
-    <main class="mozart-page">
-        <h1>Settings</h1>
-        <p id="save-status" class="mozart-text-secondary" style="font-size:12px; min-height:16px;"></p>
+    <div class="mozart-settings-shell">
+        <nav class="mozart-settings-sidebar">
+            <h1 class="mozart-settings-title">Settings</h1>
+            <div class="mozart-settings-search">
+                <span class="mozart-icon mozart-icon-search"></span>
+                <input id="settings-search" type="search" placeholder="Search settings" autocomplete="off" />
+            </div>
+            <div class="mozart-settings-nav" id="settings-nav">
+                <div class="mozart-settings-nav-item" data-page="general">
+                    <span class="mozart-icon mozart-icon-general"></span>General
+                </div>
+                <div class="mozart-settings-nav-item" data-page="appearance">
+                    <span class="mozart-icon mozart-icon-appearance"></span>Appearance
+                </div>
+                <div class="mozart-settings-nav-item" data-page="privacy">
+                    <span class="mozart-icon mozart-icon-privacy"></span>Privacy &amp; security
+                </div>
+                <div class="mozart-settings-nav-item" data-page="downloads">
+                    <span class="mozart-icon mozart-icon-downloads"></span>Downloads
+                </div>
+                <div class="mozart-settings-nav-item" data-page="browser">
+                    <span class="mozart-icon mozart-icon-browser"></span>Default browser
+                </div>
+                <div class="mozart-settings-nav-item" data-page="about">
+                    <span class="mozart-icon mozart-icon-about"></span>About
+                </div>
+            </div>
+        </nav>
 
-        <section class="mozart-section">
-            <h2>General</h2>
-            <div class="mozart-surface" style="padding:0 14px;">
-                <div class="mozart-field">
-                    <div>
-                        <div class="mozart-field-label">Homepage</div>
-                        <div class="mozart-field-hint">Shown when you click the home button.</div>
+        <main class="mozart-settings-content">
+            <p id="save-status" class="mozart-text-secondary"></p>
+
+            <!-- Shown only while the search box has text: every matching row, from every
+                 category, in one list -- mirrors how chrome://settings' own search works. -->
+            <div id="search-results" class="mozart-settings-page mozart-settings-search-results"></div>
+
+            <section id="page-general" class="mozart-settings-page">
+                <h2 class="mozart-page-title">General</h2>
+                <section class="mozart-section" data-category="general">
+                    <h2><span class="mozart-icon mozart-icon-general"></span>General</h2>
+                    <div class="mozart-surface" style="padding:0 14px;">
+                        <div class="mozart-field" data-search="homepage shown when you click the home button">
+                            <div>
+                                <div class="mozart-field-label">Homepage</div>
+                                <div class="mozart-field-hint">Shown when you click the home button.</div>
+                            </div>
+                            <input id="homepage-url" type="text" style="width:260px;" />
+                        </div>
+                        <div class="mozart-field" data-search="search engine">
+                            <div class="mozart-field-label">Search engine</div>
+                            <select id="search-engine"></select>
+                        </div>
+                        <div class="mozart-field" data-search="on startup">
+                            <div class="mozart-field-label">On startup</div>
+                            <select id="startup-mode">
+                                <option value="0">Open the New Tab page</option>
+                                <option value="1">Continue where you left off</option>
+                                <option value="3">Continue, plus a new tab</option>
+                                <option value="2">Open specific pages</option>
+                            </select>
+                        </div>
+                        <div id="startup-pages-field" class="mozart-field" style="display:none; flex-direction:column; align-items:stretch;">
+                            <div class="mozart-field-label" style="margin-bottom:6px;">Pages to open (one URL per line)</div>
+                            <textarea id="startup-pages" rows="3" style="font-family:inherit; font-size:13px; padding:6px 10px; border-radius:6px; border:1px solid var(--mozart-border); background:var(--mozart-surface); color:var(--mozart-text-primary);"></textarea>
+                        </div>
                     </div>
-                    <input id="homepage-url" type="text" style="width:260px;" />
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Search engine</div>
-                    <select id="search-engine"></select>
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">On startup</div>
-                    <select id="startup-mode">
-                        <option value="0">Open the New Tab page</option>
-                        <option value="1">Continue where you left off</option>
-                        <option value="3">Continue, plus a new tab</option>
-                        <option value="2">Open specific pages</option>
-                    </select>
-                </div>
-                <div id="startup-pages-field" class="mozart-field" style="display:none; flex-direction:column; align-items:stretch;">
-                    <div class="mozart-field-label" style="margin-bottom:6px;">Pages to open (one URL per line)</div>
-                    <textarea id="startup-pages" rows="3" style="font-family:inherit; font-size:13px; padding:6px 10px; border-radius:6px; border:1px solid var(--mozart-border); background:var(--mozart-surface); color:var(--mozart-text-primary);"></textarea>
-                </div>
-            </div>
-        </section>
+                </section>
+            </section>
 
-        <section class="mozart-section">
-            <h2>Appearance</h2>
-            <div class="mozart-surface" style="padding:0 14px;">
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Theme</div>
-                    <select id="theme">
-                        <option value="0">Match system</option>
-                        <option value="1">Light</option>
-                        <option value="2">Dark</option>
-                    </select>
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Show bookmarks bar</div>
-                    <label class="mozart-switch"><input id="show-bookmark-bar" type="checkbox" /><span></span></label>
-                </div>
-            </div>
-        </section>
-
-        <section class="mozart-section">
-            <h2>Privacy &amp; security</h2>
-            <div class="mozart-surface" style="padding:0 14px;">
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Secure DNS</div>
-                    <select id="secure-dns-mode">
-                        <option value="0">Off</option>
-                        <option value="1">Automatic</option>
-                        <option value="2">Custom</option>
-                    </select>
-                </div>
-                <div id="secure-dns-provider-field" class="mozart-field" style="display:none;">
-                    <div class="mozart-field-label">Provider</div>
-                    <select id="secure-dns-provider">
-                        <option value="cloudflare">Cloudflare</option>
-                        <option value="google">Google</option>
-                        <option value="quad9">Quad9</option>
-                        <option value="cleanbrowsing">CleanBrowsing (family filter)</option>
-                    </select>
-                </div>
-                <div id="secure-dns-custom-field" class="mozart-field" style="display:none;">
-                    <div class="mozart-field-label">DoH template URL</div>
-                    <input id="secure-dns-custom" type="text" style="width:260px;" placeholder="https://…/dns-query" />
-                </div>
-                <div class="mozart-field">
-                    <div>
-                        <div class="mozart-field-label">Offer to save passwords</div>
+            <section id="page-appearance" class="mozart-settings-page">
+                <h2 class="mozart-page-title">Appearance</h2>
+                <section class="mozart-section" data-category="appearance">
+                    <h2><span class="mozart-icon mozart-icon-appearance"></span>Appearance</h2>
+                    <div class="mozart-surface" style="padding:0 14px;">
+                        <div class="mozart-field" data-search="theme match system light dark">
+                            <div class="mozart-field-label">Theme</div>
+                            <select id="theme">
+                                <option value="0">Match system</option>
+                                <option value="1">Light</option>
+                                <option value="2">Dark</option>
+                            </select>
+                        </div>
+                        <div class="mozart-field" data-search="show bookmarks bar">
+                            <div class="mozart-field-label">Show bookmarks bar</div>
+                            <label class="mozart-switch"><input id="show-bookmark-bar" type="checkbox" /><span></span></label>
+                        </div>
                     </div>
-                    <label class="mozart-switch"><input id="offer-save-passwords" type="checkbox" /><span></span></label>
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Autofill saved passwords</div>
-                    <label class="mozart-switch"><input id="autofill-passwords" type="checkbox" /><span></span></label>
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Manage saved passwords</div>
-                    <button id="open-password-manager">Open Password Manager</button>
-                </div>
-                <div class="mozart-field">
-                    <div>
-                        <div class="mozart-field-label">Clear cookies and cache on close</div>
+                </section>
+            </section>
+
+            <section id="page-privacy" class="mozart-settings-page">
+                <h2 class="mozart-page-title">Privacy &amp; security</h2>
+                <section class="mozart-section" data-category="privacy">
+                    <h2><span class="mozart-icon mozart-icon-privacy"></span>Privacy &amp; security</h2>
+                    <div class="mozart-surface" style="padding:0 14px;">
+                        <div class="mozart-field" data-search="secure dns">
+                            <div class="mozart-field-label">Secure DNS</div>
+                            <select id="secure-dns-mode">
+                                <option value="0">Off</option>
+                                <option value="1">Automatic</option>
+                                <option value="2">Custom</option>
+                            </select>
+                        </div>
+                        <div id="secure-dns-provider-field" class="mozart-field" style="display:none;">
+                            <div class="mozart-field-label">Provider</div>
+                            <select id="secure-dns-provider">
+                                <option value="cloudflare">Cloudflare</option>
+                                <option value="google">Google</option>
+                                <option value="quad9">Quad9</option>
+                                <option value="cleanbrowsing">CleanBrowsing (family filter)</option>
+                            </select>
+                        </div>
+                        <div id="secure-dns-custom-field" class="mozart-field" style="display:none;">
+                            <div class="mozart-field-label">DoH template URL</div>
+                            <input id="secure-dns-custom" type="text" style="width:260px;" placeholder="https://…/dns-query" />
+                        </div>
+                        <div class="mozart-field" data-search="offer to save passwords">
+                            <div class="mozart-field-label">Offer to save passwords</div>
+                            <label class="mozart-switch"><input id="offer-save-passwords" type="checkbox" /><span></span></label>
+                        </div>
+                        <div class="mozart-field" data-search="autofill saved passwords">
+                            <div class="mozart-field-label">Autofill saved passwords</div>
+                            <label class="mozart-switch"><input id="autofill-passwords" type="checkbox" /><span></span></label>
+                        </div>
+                        <div class="mozart-field" data-search="manage saved passwords password manager">
+                            <div class="mozart-field-label">Manage saved passwords</div>
+                            <button id="open-password-manager"><span class="mozart-icon mozart-icon-key" style="vertical-align:-3px; margin-right:4px;"></span>Open Password Manager</button>
+                        </div>
+                        <div class="mozart-field" data-search="clear cookies and cache on close">
+                            <div class="mozart-field-label">Clear cookies and cache on close</div>
+                            <label class="mozart-switch"><input id="clear-on-close" type="checkbox" /><span></span></label>
+                        </div>
+                        <div class="mozart-field" data-search="clear browsing data">
+                            <div class="mozart-field-label">Browsing data</div>
+                            <button id="open-clear-data" class="mozart-danger">Clear browsing data…</button>
+                        </div>
                     </div>
-                    <label class="mozart-switch"><input id="clear-on-close" type="checkbox" /><span></span></label>
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Browsing data</div>
-                    <button id="open-clear-data" class="mozart-danger">Clear browsing data…</button>
-                </div>
-            </div>
-        </section>
+                </section>
+            </section>
 
-        <section class="mozart-section">
-            <h2>Downloads</h2>
-            <div class="mozart-surface" style="padding:0 14px;">
-                <div class="mozart-field">
-                    <div>
-                        <div class="mozart-field-label">Location</div>
-                        <div id="downloads-location" class="mozart-field-hint"></div>
+            <section id="page-downloads" class="mozart-settings-page">
+                <h2 class="mozart-page-title">Downloads</h2>
+                <section class="mozart-section" data-category="downloads">
+                    <h2><span class="mozart-icon mozart-icon-downloads"></span>Downloads</h2>
+                    <div class="mozart-surface" style="padding:0 14px;">
+                        <div class="mozart-field" data-search="downloads location folder">
+                            <div>
+                                <div class="mozart-field-label">Location</div>
+                                <div id="downloads-location" class="mozart-field-hint"></div>
+                            </div>
+                            <button id="change-downloads-folder">Change…</button>
+                        </div>
+                        <div class="mozart-field" data-search="ask where to save each file">
+                            <div class="mozart-field-label">Ask where to save each file</div>
+                            <label class="mozart-switch"><input id="ask-where-to-save" type="checkbox" /><span></span></label>
+                        </div>
+                        <div class="mozart-field" data-search="show downloads when done">
+                            <div class="mozart-field-label">Show downloads when done</div>
+                            <label class="mozart-switch"><input id="show-downloads-done" type="checkbox" /><span></span></label>
+                        </div>
                     </div>
-                    <button id="change-downloads-folder">Change…</button>
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Ask where to save each file</div>
-                    <label class="mozart-switch"><input id="ask-where-to-save" type="checkbox" /><span></span></label>
-                </div>
-                <div class="mozart-field">
-                    <div class="mozart-field-label">Show downloads when done</div>
-                    <label class="mozart-switch"><input id="show-downloads-done" type="checkbox" /><span></span></label>
-                </div>
-            </div>
-        </section>
+                </section>
+            </section>
 
-        <section class="mozart-section">
-            <h2>Default browser</h2>
-            <div class="mozart-surface" style="padding:0 14px;">
-                <div class="mozart-field">
-                    <div id="default-browser-status" class="mozart-field-label">Checking…</div>
-                    <button id="make-default-browser">Make default…</button>
-                </div>
-            </div>
-        </section>
+            <section id="page-browser" class="mozart-settings-page">
+                <h2 class="mozart-page-title">Default browser</h2>
+                <section class="mozart-section" data-category="browser">
+                    <h2><span class="mozart-icon mozart-icon-browser"></span>Default browser</h2>
+                    <div class="mozart-surface" style="padding:0 14px;">
+                        <div class="mozart-field" data-search="default browser make default">
+                            <div id="default-browser-status" class="mozart-field-label">Checking…</div>
+                            <button id="make-default-browser">Make default…</button>
+                        </div>
+                    </div>
+                </section>
+            </section>
 
-        <section class="mozart-section">
-            <h2>About</h2>
-            <div class="mozart-surface" style="padding:0 14px;">
-                <div class="mozart-field">
-                    <div id="about-version" class="mozart-field-label">Mozart Browser</div>
-                    <button id="check-for-update">Check for updates</button>
-                </div>
-            </div>
-        </section>
-    </main>
+            <section id="page-about" class="mozart-settings-page">
+                <h2 class="mozart-page-title">About</h2>
+                <section class="mozart-section" data-category="about">
+                    <h2><span class="mozart-icon mozart-icon-about"></span>About</h2>
+                    <div class="mozart-surface" style="padding:0 14px;">
+                        <div class="mozart-field" data-search="about version check for updates">
+                            <div id="about-version" class="mozart-field-label">Mozart Browser</div>
+                            <button id="check-for-update">Check for updates</button>
+                        </div>
+                    </div>
+                </section>
+            </section>
+        </main>
+    </div>
 
     <script src="shared/mozart-bridge.js"></script>
     <script src="shared/mozart-page.js"></script>
@@ -157,6 +210,11 @@
         let settings = null;
         const $ = (id) => document.getElementById(id);
         const statusEl = $("save-status");
+        const navItems = Array.from(document.querySelectorAll(".mozart-settings-nav-item"));
+        const pages = Array.from(document.querySelectorAll(".mozart-settings-page"));
+        const searchInput = $("settings-search");
+        const searchResults = $("search-results");
+        let activePage = "general";
 
         function populateForm() {
             $("homepage-url").value = settings.homepageUrl;
@@ -210,9 +268,106 @@
             $(id).addEventListener("change", () => { apply(); populateForm(); scheduleSave(true); });
         }
 
+        // ---- Sidebar navigation ----
+        function showPage(pageId) {
+            activePage = pageId;
+            navItems.forEach((item) => item.classList.toggle("active", item.dataset.page === pageId));
+            pages.forEach((page) => page.classList.toggle("active", page.id === `page-${pageId}`));
+        }
+
+        navItems.forEach((item) => {
+            item.addEventListener("click", () => {
+                searchInput.value = "";
+                applySearch("");
+                showPage(item.dataset.page);
+            });
+        });
+
+        // ---- Search across every category, like chrome://settings' own search box ----
+        const categoryLabels = {
+            general: "General", appearance: "Appearance", privacy: "Privacy & security",
+            downloads: "Downloads", browser: "Default browser", about: "About"
+        };
+
+        function applySearch(query) {
+            const q = query.trim().toLowerCase();
+            const searching = q.length > 0;
+
+            searchResults.classList.toggle("active", searching);
+            pages.forEach((page) => {
+                if (page === searchResults) return;
+                page.classList.toggle("active", !searching && page.id === `page-${activePage}`);
+            });
+            navItems.forEach((item) => item.classList.toggle("active", !searching && item.dataset.page === activePage));
+
+            if (!searching) {
+                searchResults.innerHTML = "";
+                return;
+            }
+
+            const matches = Array.from(document.querySelectorAll(".mozart-field[data-search]"))
+                .filter((field) => field.dataset.search.includes(q));
+
+            if (matches.length === 0) {
+                searchResults.innerHTML = `<div class="mozart-empty">No settings found for "${MozartPage.escapeHtml(query.trim())}"</div>`;
+                return;
+            }
+
+            const byCategory = new Map();
+            for (const field of matches) {
+                const category = field.closest(".mozart-section").dataset.category;
+                if (!byCategory.has(category)) byCategory.set(category, []);
+
+                // Clone for display only -- and critically, strip every id from
+                // the clone. These fields' ids (homepage-url, theme, etc.) are
+                // load-bearing everywhere else in this script via the `$()`
+                // helper; leaving them on the clone would give the page two
+                // elements with the same id, and since this panel sits earlier
+                // in the DOM than the real pages, getElementById() would start
+                // resolving to these disabled, stale clones instead.
+                const clone = field.cloneNode(true);
+                clone.removeAttribute("data-search");
+                clone.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+                clone.querySelectorAll("input, select, textarea, button").forEach((el) => { el.disabled = true; });
+                byCategory.get(category).push(clone);
+            }
+
+            searchResults.innerHTML = "";
+            for (const [category, fields] of byCategory.entries()) {
+                const section = document.createElement("section");
+                section.className = "mozart-section";
+                section.title = `Go to ${categoryLabels[category] || category}`;
+                section.style.cursor = "pointer";
+
+                const h2 = document.createElement("h2");
+                h2.innerHTML = `<span class="mozart-icon mozart-icon-${category}"></span>${MozartPage.escapeHtml(categoryLabels[category] || category)}`;
+                section.appendChild(h2);
+
+                const surface = document.createElement("div");
+                surface.className = "mozart-surface";
+                surface.style.padding = "0 14px";
+                fields.forEach((f) => surface.appendChild(f));
+                section.appendChild(surface);
+
+                // These rows are a read-only preview (every control inside is
+                // disabled) -- clicking anywhere on the row jumps to the real,
+                // interactive page instead.
+                section.addEventListener("click", () => {
+                    searchInput.value = "";
+                    applySearch("");
+                    showPage(category);
+                });
+
+                searchResults.appendChild(section);
+            }
+        }
+
+        searchInput.addEventListener("input", () => applySearch(searchInput.value));
+
         async function init() {
             settings = await MozartBridge.call("settings.get");
             populateForm();
+            showPage("general");
 
             $("homepage-url").addEventListener("input", () => {
                 settings.homepageUrl = $("homepage-url").value;

@@ -23,6 +23,7 @@ namespace MozartBrowser.Services.Browser
         public static string HistoryUrl => BaseUrl + "history.html";
         public static string DownloadsUrl => BaseUrl + "downloads.html";
         public static string SettingsUrl => BaseUrl + "settings.html";
+        public static string PasswordsUrl => BaseUrl + "passwords.html";
         public static string ExtensionsUrl => BaseUrl + "extensions.html";
 
         /// <summary>Deep-links extensions.html straight to one extension's card — see OnPinnedExtensionClicked.</summary>
@@ -68,6 +69,7 @@ namespace MozartBrowser.Services.Browser
                     "history" => HistoryUrl,
                     "downloads" => DownloadsUrl,
                     "settings" => SettingsUrl,
+                    "passwords" => PasswordsUrl,
                     "extensions" => ExtensionsUrl,
                     _ => NewTabUrl
                 };
