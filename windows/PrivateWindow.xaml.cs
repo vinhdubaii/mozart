@@ -1,7 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -441,7 +440,7 @@ namespace MozartBrowser.Windows
 
                 var button = new Button { Style = (Style)FindResource("NavIconButton"), ToolTip = ext.Name };
 
-                if (ext.IconPath != null && File.Exists(ext.IconPath))
+                if (ext.IconPath != null && System.IO.File.Exists(ext.IconPath))
                 {
                     button.Content = new Image { Source = new BitmapImage(new Uri(ext.IconPath)), Width = 18, Height = 18 };
                 }
