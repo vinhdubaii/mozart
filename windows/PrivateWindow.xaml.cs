@@ -1,11 +1,13 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Microsoft.Web.WebView2.Core;
 using MozartBrowser.Interop;
@@ -28,8 +30,11 @@ namespace MozartBrowser.Windows
     ///     Recently Visited / Pinned tiles sourced from normal browsing
     ///     history (HistoryService), which would leak normal-session
     ///     browsing into a private window. New tabs navigate straight to
-    ///     the configured homepage instead, and the Library panel's History
-    ///     tab is hidden entirely (LibraryPanelControl.IsPrivateMode).
+    ///     the configured homepage instead. There's also no "History" item
+    ///     in this window's hamburger menu — private tabs never record
+    ///     history — and its Downloads (toolbar icon + hamburger's
+    ///     "Downloads" full-history item) point at their own separate,
+    ///     non-persisted list — see App.DownloadsFor/PrivateDownloads.
     /// </summary>
     public partial class PrivateWindow : Window
     {
@@ -41,9 +46,15 @@ namespace MozartBrowser.Windows
             InitializeComponent();
             WindowMaximizeFix.Apply(this);
 
-            LibraryPanelControl.IsPrivateMode = true;
-            LibraryPanelControl.OpenUrlRequested += (_, url) => NavigateActiveTab(url);
-            LibraryPanelControl.CloseRequested += (_, _) => LibraryPanelControl.Visibility = Visibility.Collapsed;
+            DownloadsFlyoutControl.SetServiceResolver(() => App.PrivateDownloads);
+            DownloadsFlyoutControl.FullHistoryRequested += (_, _) => _ = CreateNewTabAsync(InternalPages.DownloadsUrl);
+
+            // Same lazy-resolver pattern as MainWindow.ResolveExtensionProfile,
+            // but pointed at this window's own tabs — needed so "Allow in
+            // Incognito" (see ExtensionService.SetAllowedInIncognitoAsync) can
+            // actually add/remove an extension from the Private profile.
+            App.Extensions.SetPrivateProfileResolver(ResolvePrivateExtensionProfile);
+            App.Extensions.ExtensionRemoved += (_, _) => RebuildPinnedExtensionIcons();
 
             _ = CreateNewTabAsync();
         }
@@ -77,8 +88,13 @@ namespace MozartBrowser.Windows
             tab.WebView.CoreWebView2.Profile.IsPasswordAutosaveEnabled = false;
             tab.WebView.CoreWebView2.Profile.IsGeneralAutofillEnabled = false;
 
-            App.Downloads.Attach(tab.WebView.CoreWebView2);
-            App.Bridge.Attach(tab.WebView.CoreWebView2);
+            App.DownloadsFor(isPrivate: true).Attach(tab.WebView.CoreWebView2);
+            App.Bridge.Attach(tab.WebView.CoreWebView2, isPrivate: true);
+
+            // Replays every extension currently marked "Allow in Incognito"
+            // into this profile — a no-op after the first tab of this
+            // Private-environment lifetime (see the method's own doc comment).
+            await App.Extensions.SyncIncognitoExtensionsForPrivateProfileAsync(tab.WebView.CoreWebView2.Profile);
 
             tab.IsNewTabPage = false;
             InternalPages.TryResolveScheme(initialUrl ?? DefaultHomeUrl, out var resolvedUrl);
@@ -86,6 +102,7 @@ namespace MozartBrowser.Windows
 
             RebuildTabStrip();
             SetActiveTab(tab);
+            RebuildPinnedExtensionIcons();
         }
 
         private void WireTabEvents(BrowserTab tab)
@@ -287,7 +304,12 @@ namespace MozartBrowser.Windows
             BackButton.IsEnabled = tab.CanGoBack;
             ForwardButton.IsEnabled = tab.CanGoForward;
             LockIcon.Visibility = tab.Url.StartsWith("https://") ? Visibility.Visible : Visibility.Collapsed;
-            _ = UpdateBookmarkStarAsync(tab.Url);
+
+            var isInternalPage = InternalPages.IsInternalUrl(tab.Url);
+            BookmarkStarButton.IsEnabled = !isInternalPage;
+            BookmarkStarButton.Visibility = isInternalPage ? Visibility.Collapsed : Visibility.Visible;
+            if (!isInternalPage)
+                _ = UpdateBookmarkStarAsync(tab.Url);
         }
 
         private async System.Threading.Tasks.Task UpdateBookmarkStarAsync(string url)
@@ -314,7 +336,7 @@ namespace MozartBrowser.Windows
 
         private async void BookmarkStarButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeTab == null || string.IsNullOrEmpty(_activeTab.Url)) return;
+            if (_activeTab == null || string.IsNullOrEmpty(_activeTab.Url) || InternalPages.IsInternalUrl(_activeTab.Url)) return;
 
             var isBookmarked = await App.Bookmarks.IsBookmarkedAsync(_activeTab.Url);
             if (isBookmarked)
@@ -338,14 +360,122 @@ namespace MozartBrowser.Windows
         private void HomeButton_Click(object sender, RoutedEventArgs e) => NavigateActiveTab(DefaultHomeUrl);
         private async void NewTabButton_Click(object sender, RoutedEventArgs e) => await CreateNewTabAsync();
 
-        private void LibraryButton_Click(object sender, RoutedEventArgs e)
-        {
-            LibraryPanelControl.Visibility = LibraryPanelControl.Visibility == Visibility.Visible
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+        private void DownloadsButton_Click(object sender, RoutedEventArgs e) => DownloadsFlyoutControl.Toggle(DownloadsButton);
 
-            if (LibraryPanelControl.Visibility == Visibility.Visible)
-                _ = LibraryPanelControl.RefreshAsync();
+        // ============================= Extensions (puzzle icon + pinned icons) =============================
+        // Reuses the same installed-extension list as MainWindow (extensions
+        // are installed once, globally — see ExtensionService) and the same
+        // shared PinnedExtensionIds setting, so pinning/unpinning here shows
+        // up in MainWindow's toolbar too, same as real browsers. Only "Allow
+        // in Incognito" (extensions.html) actually changes whether an
+        // extension can run in this window.
+
+        private CoreWebView2Profile? ResolvePrivateExtensionProfile() =>
+            _activeTab?.WebView.CoreWebView2?.Profile ?? Tabs.FirstOrDefault()?.WebView.CoreWebView2?.Profile;
+
+        private async void ExtensionsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var extensions = await App.Extensions.GetInstalledAsync();
+            var popup = new ContextMenu();
+
+            var allowedInPrivate = extensions.Where(x => x.AllowedInIncognito).ToList();
+            if (allowedInPrivate.Count == 0)
+            {
+                popup.Items.Add(new MenuItem { Header = "No extensions allowed in Incognito", IsEnabled = false });
+            }
+            else
+            {
+                foreach (var ext in allowedInPrivate)
+                {
+                    var isPinned = App.Settings.Current.PinnedExtensionIds.Contains(ext.Id);
+                    var item = new MenuItem
+                    {
+                        Header = ext.Name,
+                        IsCheckable = true,
+                        IsChecked = isPinned,
+                        StaysOpenOnClick = true,
+                        Icon = new ContentControl { ContentTemplate = (DataTemplate)FindResource(isPinned ? "Icon.Ext.Unpin" : "Icon.Ext.Pin") }
+                    };
+                    item.Click += async (_, _) =>
+                    {
+                        var pinned = App.Settings.Current.PinnedExtensionIds;
+                        if (item.IsChecked && !pinned.Contains(ext.Id)) pinned.Add(ext.Id);
+                        else if (!item.IsChecked) pinned.Remove(ext.Id);
+                        item.Icon = new ContentControl { ContentTemplate = (DataTemplate)FindResource(item.IsChecked ? "Icon.Ext.Unpin" : "Icon.Ext.Pin") };
+                        await App.Settings.SaveAsync();
+                        RebuildPinnedExtensionIcons();
+                    };
+                    popup.Items.Add(item);
+                }
+            }
+
+            popup.Items.Add(new Separator());
+            var manageItem = new MenuItem
+            {
+                Header = "Manage extensions",
+                Icon = new ContentControl { ContentTemplate = (DataTemplate)FindResource("Icon.Ext.Manage") }
+            };
+            manageItem.Click += (_, _) => OpenExtensionsPage();
+            popup.Items.Add(manageItem);
+
+            popup.PlacementTarget = ExtensionsButton;
+            popup.IsOpen = true;
+        }
+
+        /// <summary>
+        /// Only pinned extensions that are also allowed in Incognito get a
+        /// toolbar icon here — pinning something not allowed in Incognito
+        /// would render an icon that does nothing (the extension can't
+        /// actually run in this window), which is worse than not showing it.
+        /// </summary>
+        private async void RebuildPinnedExtensionIcons()
+        {
+            PinnedExtensionsPanel.Children.Clear();
+
+            var installed = await App.Extensions.GetInstalledAsync();
+            var byId = installed.Where(x => x.AllowedInIncognito).ToDictionary(x => x.Id);
+
+            foreach (var id in App.Settings.Current.PinnedExtensionIds)
+            {
+                if (!byId.TryGetValue(id, out var ext)) continue;
+
+                var button = new Button { Style = (Style)FindResource("NavIconButton"), ToolTip = ext.Name };
+
+                if (ext.IconPath != null && File.Exists(ext.IconPath))
+                {
+                    button.Content = new Image { Source = new BitmapImage(new Uri(ext.IconPath)), Width = 18, Height = 18 };
+                }
+                else
+                {
+                    button.Content = new Path
+                    {
+                        Width = 18,
+                        Height = 18,
+                        Stretch = Stretch.Uniform,
+                        Fill = Brushes.White,
+                        Data = (Geometry)FindResource("Icon.Nav.Extensions")
+                    };
+                }
+
+                button.Click += (_, _) => OnPinnedExtensionClicked(ext);
+                PinnedExtensionsPanel.Children.Add(button);
+            }
+        }
+
+        private void OnPinnedExtensionClicked(InstalledExtension ext)
+        {
+            if (ext.HasOptionsPage)
+                _ = CreateNewTabAsync(ext.OptionsPageUrl);
+            else
+                OpenExtensionsPage(ext.Id);
+        }
+
+        private void OpenExtensionsPage(string? highlightExtensionId = null)
+        {
+            var url = highlightExtensionId != null
+                ? InternalPages.ExtensionsUrlFor(highlightExtensionId)
+                : InternalPages.ExtensionsUrl;
+            _ = CreateNewTabAsync(url);
         }
 
         // ============================= Hamburger menu (☰) =============================
@@ -361,6 +491,13 @@ namespace MozartBrowser.Windows
             menu.Items.Add(new Separator());
             menu.Items.Add(MenuItem("Find in Page...", "Ctrl+F", (_, _) => _activeTab?.WebView.CoreWebView2.ExecuteScriptAsync("undefined")));
             menu.Items.Add(MenuItem("Print...", "Ctrl+P", (_, _) => _activeTab?.WebView.CoreWebView2.ShowPrintUI()));
+            menu.Items.Add(new Separator());
+            // Opens the same mozart://downloads page MainWindow's hamburger
+            // menu does — the bridge routes it to this window's own,
+            // separate/non-persisted download list because the requesting
+            // tab is a Private one (see InternalPageBridge, App.DownloadsFor).
+            // No "History" item here — private tabs never record history.
+            menu.Items.Add(MenuItem("Downloads", "Ctrl+J", (_, _) => _ = CreateNewTabAsync(InternalPages.DownloadsUrl)));
             menu.Items.Add(new Separator());
             menu.Items.Add(MenuItem("Close Private Window", null, (_, _) => Close()));
 
@@ -421,8 +558,13 @@ namespace MozartBrowser.Windows
             // the whole app, so opening two Private windows and closing only
             // one currently also tears down the other's profile. Multi-window
             // private-profile lifetime (e.g. ref-counting) is a separate,
-            // larger change outside this fix's scope.
+            // larger change outside this fix's scope. ClearPrivateDownloads
+            // and ResetPrivateExtensionSync share that same simplification —
+            // one shared Private download list / extension-sync state for
+            // the whole app, not one per Private window.
             App.WebViewEnvironments.CleanupPrivateEnvironment();
+            App.ClearPrivateDownloads();
+            App.Extensions.ResetPrivateExtensionSync();
         }
     }
 }

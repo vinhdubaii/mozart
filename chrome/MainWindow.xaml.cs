@@ -61,8 +61,8 @@ namespace MozartBrowser.Chrome
             if (App.Settings.Current.Window.IsMaximized)
                 WindowState = WindowState.Maximized;
 
-            LibraryPanelControl.OpenUrlRequested += (_, url) => NavigateActiveTab(url);
-            LibraryPanelControl.CloseRequested += (_, _) => LibraryPanelControl.Visibility = Visibility.Collapsed;
+            DownloadsFlyoutControl.SetServiceResolver(() => App.Downloads);
+            DownloadsFlyoutControl.FullHistoryRequested += (_, _) => _ = CreateNewTabAsync(InternalPages.DownloadsUrl);
 
             RebuildBookmarkBar();
             // Resolved lazily on every call (see ExtensionService.SetProfileResolver's
@@ -292,7 +292,7 @@ namespace MozartBrowser.Chrome
             await PasswordCaptureService.AttachAsync(tab.WebView.CoreWebView2, this);
 
             App.Downloads.Attach(tab.WebView.CoreWebView2);
-            App.Bridge.Attach(tab.WebView.CoreWebView2);
+            App.Bridge.Attach(tab.WebView.CoreWebView2, isPrivate: false);
 
             if (initialUrl != null)
             {
@@ -316,7 +316,7 @@ namespace MozartBrowser.Chrome
                 tab.CanGoBack = tab.WebView.CoreWebView2.CanGoBack;
                 tab.CanGoForward = tab.WebView.CoreWebView2.CanGoForward;
 
-                if (e.IsSuccess && !tab.IsPrivate && tab.Url != "about:blank")
+                if (e.IsSuccess && !tab.IsPrivate && tab.Url != "about:blank" && !InternalPages.IsInternalUrl(tab.Url))
                 {
                     await App.History.AddVisitAsync(tab.Url, tab.Title, tab.FaviconUrl);
                 }
@@ -529,8 +529,17 @@ namespace MozartBrowser.Chrome
             AddressBarTextBox.Text = tab.IsNewTabPage ? string.Empty : tab.Url;
             BackButton.IsEnabled = tab.CanGoBack;
             ForwardButton.IsEnabled = tab.CanGoForward;
+            // mozart:// pages don't show the padlock/"not secure" state at
+            // all, same as real browsers do for their own internal pages —
+            // already covered by the https-only check below since mozart://
+            // never starts with "https://", kept explicit here for clarity.
             LockIcon.Visibility = tab.Url.StartsWith("https://") ? Visibility.Visible : Visibility.Collapsed;
-            _ = UpdateBookmarkStarAsync(tab.Url);
+
+            var isInternalPage = InternalPages.IsInternalUrl(tab.Url);
+            BookmarkStarButton.IsEnabled = !isInternalPage;
+            BookmarkStarButton.Visibility = isInternalPage ? Visibility.Collapsed : Visibility.Visible;
+            if (!isInternalPage)
+                _ = UpdateBookmarkStarAsync(tab.Url);
         }
 
         private async System.Threading.Tasks.Task UpdateBookmarkStarAsync(string url)
@@ -587,7 +596,7 @@ namespace MozartBrowser.Chrome
 
         private async void BookmarkStarButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_activeTab == null || string.IsNullOrEmpty(_activeTab.Url)) return;
+            if (_activeTab == null || string.IsNullOrEmpty(_activeTab.Url) || InternalPages.IsInternalUrl(_activeTab.Url)) return;
 
             var isBookmarked = await App.Bookmarks.IsBookmarkedAsync(_activeTab.Url);
             if (isBookmarked)
@@ -599,15 +608,7 @@ namespace MozartBrowser.Chrome
             RebuildBookmarkBar();
         }
 
-        private void LibraryButton_Click(object sender, RoutedEventArgs e)
-        {
-            LibraryPanelControl.Visibility = LibraryPanelControl.Visibility == Visibility.Visible
-                ? Visibility.Collapsed
-                : Visibility.Visible;
-
-            if (LibraryPanelControl.Visibility == Visibility.Visible)
-                _ = LibraryPanelControl.RefreshAsync();
-        }
+        private void DownloadsButton_Click(object sender, RoutedEventArgs e) => DownloadsFlyoutControl.Toggle(DownloadsButton);
 
         // ============================= Extensions (puzzle icon + pinned icons) =============================
 
@@ -794,6 +795,10 @@ namespace MozartBrowser.Chrome
 
             menu.Items.Add(MenuItem("Find in Page...", "Ctrl+F", (_, _) => _activeTab?.WebView.CoreWebView2.ExecuteScriptAsync("undefined"), "Icon.Menu.FindInPage"));
             menu.Items.Add(MenuItem("Print...", "Ctrl+P", (_, _) => _activeTab?.WebView.CoreWebView2.ShowPrintUI(), "Icon.Print"));
+            menu.Items.Add(new Separator());
+
+            menu.Items.Add(MenuItem("History", "Ctrl+H", (_, _) => _ = CreateNewTabAsync(InternalPages.HistoryUrl), "Icon.Menu.History"));
+            menu.Items.Add(MenuItem("Downloads", "Ctrl+J", (_, _) => _ = CreateNewTabAsync(InternalPages.DownloadsUrl), "Icon.Menu.Downloads"));
             menu.Items.Add(new Separator());
 
             menu.Items.Add(MenuItem("Settings", null, (_, _) => _ = CreateNewTabAsync(InternalPages.SettingsUrl), "Icon.Menu.Settings"));

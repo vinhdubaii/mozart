@@ -34,6 +34,9 @@ namespace MozartBrowser.Models
 
         public bool IsEnabled { get; set; }
 
+        /// <summary>Chrome-style "Allow in Incognito" toggle — whether this extension is also registered against the Private profile. See ExtensionService.SetAllowedInIncognitoAsync.</summary>
+        public bool AllowedInIncognito { get; set; }
+
         /// <summary>Plain permission strings from the manifest (e.g. "storage", "tabs") — excludes URL match patterns.</summary>
         public List<string> Permissions { get; init; } = new();
 

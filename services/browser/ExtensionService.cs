@@ -13,17 +13,21 @@ namespace MozartBrowser.Services.Browser
 {
     /// <summary>
     /// Downloads, unpacks, installs, and manages browser extensions on top
-    /// of WebView2's (experimental) extension APIs. Extensions only ever
-    /// load into the Normal CoreWebView2Profile — see
-    /// WebViewEnvironmentService, which only sets AreBrowserExtensionsEnabled
-    /// on NormalEnvironment. A singleton owned by App, mirroring the shape
-    /// of BookmarkService/DownloadService.
+    /// of WebView2's (experimental) extension APIs. Extensions install into
+    /// the Normal CoreWebView2Profile by default; whether an installed
+    /// extension is also registered against the Private profile — and can
+    /// therefore actually run in Private windows — is gated per-extension by
+    /// InstalledExtension.AllowedInIncognito (see SetAllowedInIncognitoAsync
+    /// and SyncIncognitoExtensionsForPrivateProfileAsync). A singleton owned
+    /// by App, mirroring the shape of BookmarkService/DownloadService.
     /// </summary>
     public class ExtensionService
     {
         private readonly string _extensionsRootFolder;
         private readonly string _idMapPath;
+        private readonly string _incognitoAllowedPath;
         private readonly HttpClient _httpClient = new();
+        private bool _privateExtensionsSynced;
 
         // Resolved fresh on every call instead of cached once - a
         // CoreWebView2Profile .NET wrapper is tied to the specific tab whose
@@ -39,6 +43,16 @@ namespace MozartBrowser.Services.Browser
         private Func<CoreWebView2Profile?>? _profileResolver;
 
         /// <summary>
+        /// Same idea as _profileResolver, but for the Private window's own
+        /// CoreWebView2Profile — needed so "Allow in Incognito" can actually
+        /// add/remove the extension from that separate profile. Null
+        /// whenever no Private window is currently open (see
+        /// SetAllowedInIncognitoAsync/SyncIncognitoExtensionsForPrivateProfileAsync
+        /// for how that's handled).
+        /// </summary>
+        private Func<CoreWebView2Profile?>? _privateProfileResolver;
+
+        /// <summary>
         /// Raised after RemoveAsync actually removes an extension, so
         /// MainWindow can drop its pinned toolbar icon (if any) without
         /// SettingsWindow having to reach into MainWindow directly.
@@ -49,6 +63,7 @@ namespace MozartBrowser.Services.Browser
         {
             _extensionsRootFolder = Path.Combine(appDataFolder, "Extensions");
             _idMapPath = Path.Combine(_extensionsRootFolder, "extension-id-map.json");
+            _incognitoAllowedPath = Path.Combine(_extensionsRootFolder, "extension-incognito.json");
             Directory.CreateDirectory(_extensionsRootFolder);
         }
 
@@ -62,6 +77,77 @@ namespace MozartBrowser.Services.Browser
         public void SetProfileResolver(Func<CoreWebView2Profile?> resolver) => _profileResolver = resolver;
 
         private CoreWebView2Profile? ResolveProfile() => _profileResolver?.Invoke();
+
+        /// <summary>Called once from PrivateWindow (mirrors SetProfileResolver), re-resolved on every call so it always reflects whichever Private tab is currently live.</summary>
+        public void SetPrivateProfileResolver(Func<CoreWebView2Profile?> resolver) => _privateProfileResolver = resolver;
+
+        private CoreWebView2Profile? ResolvePrivateProfile() => _privateProfileResolver?.Invoke();
+
+        /// <summary>
+        /// Re-registers every extension already marked "Allow in Incognito"
+        /// against a freshly-created Private profile. Needed because the
+        /// Private environment/profile is temporary (wiped on window close,
+        /// see WebViewEnvironmentService.CleanupPrivateEnvironment) — a fresh
+        /// one starts with no extensions at all regardless of what was
+        /// allowed in a previous Private session, so this replays those
+        /// grants once per Private-environment lifetime. Call after the
+        /// first Private tab's CoreWebView2 is ready; call
+        /// ResetPrivateExtensionSync when the Private environment is torn down
+        /// so the next Private window re-syncs instead of no-op'ing.
+        /// </summary>
+        public async Task SyncIncognitoExtensionsForPrivateProfileAsync(CoreWebView2Profile privateProfile)
+        {
+            if (_privateExtensionsSynced) return;
+            _privateExtensionsSynced = true;
+
+            var allowed = LoadIncognitoAllowedSet();
+            if (allowed.Count == 0) return;
+
+            var map = LoadIdMap();
+            foreach (var id in allowed)
+            {
+                var folder = ResolveFolder(id, map);
+                if (folder == null) continue;
+                try { await privateProfile.AddBrowserExtensionAsync(folder); }
+                catch { /* best-effort — extension may already be registered, or its folder may be gone */ }
+            }
+        }
+
+        /// <summary>Call when the shared Private environment is cleaned up (see PrivateWindow.PrivateWindow_Closed), so the next Private window replays incognito-allowed extensions into its own fresh profile.</summary>
+        public void ResetPrivateExtensionSync() => _privateExtensionsSynced = false;
+
+        /// <summary>Chrome-style "Allow in Incognito" toggle — persists the flag and, if a Private window is currently open, adds/removes the extension from its profile immediately.</summary>
+        public async Task SetAllowedInIncognitoAsync(string extensionId, bool allowed)
+        {
+            var allowedSet = LoadIncognitoAllowedSet();
+            if (allowed) allowedSet.Add(extensionId);
+            else allowedSet.Remove(extensionId);
+            SaveIncognitoAllowedSet(allowedSet);
+
+            var privateProfile = ResolvePrivateProfile();
+            if (privateProfile == null) return; // No Private window open right now — SyncIncognitoExtensionsForPrivateProfileAsync applies this the next time one opens.
+
+            if (allowed)
+            {
+                var map = LoadIdMap();
+                var folder = ResolveFolder(extensionId, map);
+                if (folder != null)
+                {
+                    try { await privateProfile.AddBrowserExtensionAsync(folder); }
+                    catch { /* best-effort, e.g. already registered */ }
+                }
+            }
+            else
+            {
+                try
+                {
+                    var live = await privateProfile.GetBrowserExtensionsAsync();
+                    var match = live.FirstOrDefault(e => e.Id == extensionId);
+                    if (match != null) await match.RemoveAsync();
+                }
+                catch { /* best-effort */ }
+            }
+        }
 
         /// <summary>
         /// Full store-install pipeline: download the .crx by ID, unpack it,
@@ -152,6 +238,7 @@ namespace MozartBrowser.Services.Browser
             if (profile == null) return result;
 
             var map = LoadIdMap();
+            var incognitoAllowed = LoadIncognitoAllowedSet();
             var live = await profile.GetBrowserExtensionsAsync();
             foreach (var ext in live)
             {
@@ -160,6 +247,7 @@ namespace MozartBrowser.Services.Browser
                 if (parsed == null) continue;
 
                 parsed.IsEnabled = ext.IsEnabled;
+                parsed.AllowedInIncognito = incognitoAllowed.Contains(ext.Id);
                 result.Add(parsed);
             }
             return result;
@@ -183,6 +271,26 @@ namespace MozartBrowser.Services.Browser
             var match = live.FirstOrDefault(e => e.Id == extensionId);
             if (match != null)
                 await match.RemoveAsync();
+
+            // Also drop it from the Private profile (if it was ever allowed
+            // there) and forget the incognito grant entirely, so it doesn't
+            // silently reappear if this same extension ID is ever reinstalled.
+            var incognitoAllowed = LoadIncognitoAllowedSet();
+            if (incognitoAllowed.Remove(extensionId))
+            {
+                SaveIncognitoAllowedSet(incognitoAllowed);
+                var privateProfile = ResolvePrivateProfile();
+                if (privateProfile != null)
+                {
+                    try
+                    {
+                        var privateLive = await privateProfile.GetBrowserExtensionsAsync();
+                        var privateMatch = privateLive.FirstOrDefault(e => e.Id == extensionId);
+                        if (privateMatch != null) await privateMatch.RemoveAsync();
+                    }
+                    catch { /* best-effort */ }
+                }
+            }
 
             var map = LoadIdMap();
             var folder = ResolveFolder(extensionId, map);
@@ -395,6 +503,24 @@ namespace MozartBrowser.Services.Browser
 
         private void SaveIdMap(Dictionary<string, string> map) =>
             File.WriteAllText(_idMapPath, JsonSerializer.Serialize(map));
+
+        /// <summary>Set of live extension IDs currently allowed to run in Private windows — see SetAllowedInIncognitoAsync.</summary>
+        private HashSet<string> LoadIncognitoAllowedSet()
+        {
+            if (!File.Exists(_incognitoAllowedPath)) return new HashSet<string>();
+            try
+            {
+                return JsonSerializer.Deserialize<HashSet<string>>(File.ReadAllText(_incognitoAllowedPath))
+                       ?? new HashSet<string>();
+            }
+            catch
+            {
+                return new HashSet<string>();
+            }
+        }
+
+        private void SaveIncognitoAllowedSet(HashSet<string> allowed) =>
+            File.WriteAllText(_incognitoAllowedPath, JsonSerializer.Serialize(allowed));
 
         /// <summary>
         /// Resolves a live extension Id to its folder on disk via the id

@@ -27,6 +27,22 @@ namespace MozartBrowser
         public static BookmarkService Bookmarks { get; private set; } = null!;
         public static PasswordVaultService Passwords { get; private set; } = null!;
         public static DownloadService Downloads { get; private set; } = null!;
+
+        /// <summary>
+        /// Download list scoped to Private windows only — created on first
+        /// use (see DownloadsFor), never persisted, and dropped by
+        /// ClearPrivateDownloads when the last Private window closes,
+        /// mirroring WebViewEnvironmentService's own single shared
+        /// PrivateEnvironment lifetime (see PrivateWindow.PrivateWindow_Closed).
+        /// </summary>
+        public static DownloadService? PrivateDownloads { get; private set; }
+
+        /// <summary>Returns the right DownloadService for a tab, creating the Private one lazily on first use.</summary>
+        public static DownloadService DownloadsFor(bool isPrivate) =>
+            isPrivate ? (PrivateDownloads ??= new DownloadService(Settings)) : Downloads;
+
+        /// <summary>Drops the Private download list entirely. Call when the last Private window closes.</summary>
+        public static void ClearPrivateDownloads() => PrivateDownloads = null;
         public static SearchEngineService SearchEngines { get; private set; } = null!;
         public static WebViewEnvironmentService WebViewEnvironments { get; private set; } = null!;
         public static UpdateService Updates { get; private set; } = null!;
@@ -182,30 +198,35 @@ namespace MozartBrowser
             });
 
             // ---- Downloads ----
-            Bridge.RegisterHandler("downloads.getAll", _ =>
-                Task.FromResult<object?>(Downloads.Downloads.ToList()));
-            Bridge.RegisterHandler("downloads.open", payload =>
+            // Every handler below reads/writes DownloadsFor(isPrivate) rather
+            // than the global Downloads service directly, so downloads.html
+            // opened from a Private tab (Private window's "Full download
+            // history" hamburger item) transparently shows/acts on that
+            // window's own, non-persisted download list instead of Normal's.
+            Bridge.RegisterHandler("downloads.getAll", (_, isPrivate) =>
+                Task.FromResult<object?>(DownloadsFor(isPrivate).Downloads.ToList()));
+            Bridge.RegisterHandler("downloads.open", (payload, isPrivate) =>
             {
-                var item = Downloads.Downloads.FirstOrDefault(d => d.Id == payload.GetProperty("id").GetString());
+                var item = DownloadsFor(isPrivate).Downloads.FirstOrDefault(d => d.Id == payload.GetProperty("id").GetString());
                 if (item != null && File.Exists(item.FilePath))
                     Process.Start(new ProcessStartInfo(item.FilePath) { UseShellExecute = true });
                 return Task.FromResult<object?>(null);
             });
-            Bridge.RegisterHandler("downloads.showInFolder", payload =>
+            Bridge.RegisterHandler("downloads.showInFolder", (payload, isPrivate) =>
             {
-                var item = Downloads.Downloads.FirstOrDefault(d => d.Id == payload.GetProperty("id").GetString());
+                var item = DownloadsFor(isPrivate).Downloads.FirstOrDefault(d => d.Id == payload.GetProperty("id").GetString());
                 if (item != null && File.Exists(item.FilePath))
                     Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{item.FilePath}\"") { UseShellExecute = true });
                 return Task.FromResult<object?>(null);
             });
-            Bridge.RegisterHandler("downloads.remove", payload =>
+            Bridge.RegisterHandler("downloads.remove", (payload, isPrivate) =>
             {
-                Downloads.Remove(payload.GetProperty("id").GetString() ?? string.Empty);
+                DownloadsFor(isPrivate).Remove(payload.GetProperty("id").GetString() ?? string.Empty);
                 return Task.FromResult<object?>(null);
             });
-            Bridge.RegisterHandler("downloads.clearCompleted", _ =>
+            Bridge.RegisterHandler("downloads.clearCompleted", (_, isPrivate) =>
             {
-                Downloads.ClearCompleted();
+                DownloadsFor(isPrivate).ClearCompleted();
                 return Task.FromResult<object?>(null);
             });
 
@@ -221,6 +242,13 @@ namespace MozartBrowser
             Bridge.RegisterHandler("extensions.remove", async payload =>
             {
                 await Extensions.RemoveAsync(payload.GetProperty("id").GetString() ?? string.Empty);
+                return null;
+            });
+            Bridge.RegisterHandler("extensions.setAllowedInIncognito", async payload =>
+            {
+                await Extensions.SetAllowedInIncognitoAsync(
+                    payload.GetProperty("id").GetString() ?? string.Empty,
+                    payload.GetProperty("allowed").GetBoolean());
                 return null;
             });
             Bridge.RegisterHandler("extensions.loadUnpacked", async _ =>

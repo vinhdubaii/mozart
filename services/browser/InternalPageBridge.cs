@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
@@ -11,6 +12,12 @@ namespace MozartBrowser.Services.Browser
     /// Downloads, Settings — see InternalPages) and the C# services that
     /// actually own the data (HistoryService, DownloadService, SettingsService,
     /// BookmarkService...).
+    ///
+    /// Also owns serving the pages themselves: every "mozart://<host>/..."
+    /// request is answered here (see OnWebResourceRequested) straight from
+    /// assets/InternalPages on disk, now that internal pages are a real
+    /// registered custom scheme (see WebViewEnvironmentService) instead of an
+    /// https virtual-host mapping.
     ///
     /// Protocol, page → host (request):
     ///   window.chrome.webview.postMessage(JSON.stringify({ id, action, payload }))
@@ -31,43 +38,65 @@ namespace MozartBrowser.Services.Browser
     /// in this CoreWebView2, not just Mozart's own — a malicious website could
     /// otherwise call postMessage itself and trigger privileged actions (read
     /// history, delete downloads, change settings). Every request is checked
-    /// against e.Source and silently ignored unless it originates from
-    /// InternalPages.BaseUrl.
+    /// against e.Source and silently ignored unless it originates from the
+    /// "mozart://" scheme.
     /// </summary>
     public class InternalPageBridge
     {
-        public delegate Task<object?> HandlerFunc(JsonElement payload);
+        /// <summary>
+        /// isPrivate reflects which CoreWebView2 the request came from (see
+        /// Attach), so e.g. "downloads.getAll" can answer with the calling
+        /// window's own download list — Normal or Private — without either
+        /// side needing a separate URL/page.
+        /// </summary>
+        public delegate Task<object?> HandlerFunc(JsonElement payload, bool isPrivate);
 
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
+        private static readonly Dictionary<string, string> ContentTypes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [".html"] = "text/html",
+            [".css"] = "text/css",
+            [".js"] = "text/javascript"
+        };
+
         private readonly Dictionary<string, HandlerFunc> _handlers = new();
         private readonly List<CoreWebView2> _attached = new();
+        private readonly Dictionary<CoreWebView2, bool> _isPrivate = new();
         private readonly object _lock = new();
 
         /// <summary>Registers (or replaces) the handler for a given action name, e.g. "history.getRecent".</summary>
         public void RegisterHandler(string action, HandlerFunc handler) => _handlers[action] = handler;
 
-        /// <summary>
-        /// Wires this bridge onto a tab's CoreWebView2: sets up the virtual
-        /// host mapping so its internal pages resolve at all, and starts
-        /// listening for bridge requests. Safe to call once per tab, right
-        /// after EnsureCoreWebView2Async — every tab needs this, not just
-        /// ones currently showing an internal page, since the user can
-        /// navigate any tab to mozart://history etc. at any time.
-        /// </summary>
-        public void Attach(CoreWebView2 coreWebView2)
-        {
-            coreWebView2.SetVirtualHostNameToFolderMapping(
-                InternalPages.VirtualHost,
-                InternalPages.FolderPath,
-                CoreWebView2HostResourceAccessKind.Allow);
+        /// <summary>Convenience overload for handlers that don't care whether the caller is a Normal or Private tab.</summary>
+        public void RegisterHandler(string action, Func<JsonElement, Task<object?>> handler) =>
+            _handlers[action] = (payload, _) => handler(payload);
 
+        /// <summary>
+        /// Wires this bridge onto a tab's CoreWebView2: registers the
+        /// mozart:// resource filter so its internal pages actually resolve,
+        /// and starts listening for bridge requests. Safe to call once per
+        /// tab, right after EnsureCoreWebView2Async — every tab needs this,
+        /// not just ones currently showing an internal page, since the user
+        /// can navigate any tab to mozart://history etc. at any time.
+        /// isPrivate must reflect whether this tab belongs to a Private
+        /// window, so per-window bridge actions (downloads.*) answer with
+        /// the right data set.
+        /// </summary>
+        public void Attach(CoreWebView2 coreWebView2, bool isPrivate)
+        {
+            coreWebView2.AddWebResourceRequestedFilter($"{InternalPages.Scheme}://*", CoreWebView2WebResourceContext.All);
+            coreWebView2.WebResourceRequested += OnWebResourceRequested;
             coreWebView2.WebMessageReceived += OnWebMessageReceived;
 
-            lock (_lock) _attached.Add(coreWebView2);
+            lock (_lock)
+            {
+                _attached.Add(coreWebView2);
+                _isPrivate[coreWebView2] = isPrivate;
+            }
         }
 
         /// <summary>Call when a tab is closing, so BroadcastEventAsync stops trying to reach a disposed CoreWebView2.</summary>
@@ -75,8 +104,14 @@ namespace MozartBrowser.Services.Browser
         {
             try { coreWebView2.WebMessageReceived -= OnWebMessageReceived; }
             catch { /* already disposed — nothing left to unsubscribe from */ }
+            try { coreWebView2.WebResourceRequested -= OnWebResourceRequested; }
+            catch { /* already disposed */ }
 
-            lock (_lock) _attached.Remove(coreWebView2);
+            lock (_lock)
+            {
+                _attached.Remove(coreWebView2);
+                _isPrivate.Remove(coreWebView2);
+            }
         }
 
         /// <summary>
@@ -96,8 +131,7 @@ namespace MozartBrowser.Services.Browser
             {
                 try
                 {
-                    if (coreWebView2.Source != null &&
-                        coreWebView2.Source.StartsWith(InternalPages.BaseUrl, StringComparison.OrdinalIgnoreCase))
+                    if (coreWebView2.Source != null && InternalPages.IsInternalUrl(coreWebView2.Source))
                     {
                         coreWebView2.PostWebMessageAsJson(json);
                     }
@@ -110,17 +144,63 @@ namespace MozartBrowser.Services.Browser
             }
         }
 
+        /// <summary>
+        /// Serves every "mozart://<host>/<path>" request straight from
+        /// assets/InternalPages — <host>.html for a bare page request (e.g.
+        /// "mozart://settings" → settings.html) and any deeper path (e.g.
+        /// "mozart://settings/shared/base.css") resolved relative to that
+        /// same folder, matching how the old SetVirtualHostNameToFolderMapping
+        /// resolved paths under the single shared InternalPages folder.
+        /// </summary>
+        private void OnWebResourceRequested(object? sender, CoreWebView2WebResourceRequestedEventArgs e)
+        {
+            if (sender is not CoreWebView2 coreWebView2) return;
+
+            Uri uri;
+            try { uri = new Uri(e.Request.Uri); }
+            catch { return; }
+
+            if (!string.Equals(uri.Scheme, InternalPages.Scheme, StringComparison.OrdinalIgnoreCase)) return;
+
+            var relativePath = uri.AbsolutePath.Trim('/');
+            var filePath = string.IsNullOrEmpty(relativePath)
+                ? Path.Combine(InternalPages.FolderPath, $"{uri.Host}.html")
+                : Path.Combine(InternalPages.FolderPath, relativePath.Replace('/', Path.DirectorySeparatorChar));
+
+            // Any request straight at a host with no path segments (e.g.
+            // "mozart://settings", "mozart://extensions") is the page itself.
+            if (string.IsNullOrEmpty(relativePath))
+                filePath = Path.Combine(InternalPages.FolderPath, $"{uri.Host}.html");
+
+            var environment = coreWebView2.Environment;
+            if (!File.Exists(filePath))
+            {
+                e.Response = environment.CreateWebResourceResponse(null, 404, "Not Found", string.Empty);
+                return;
+            }
+
+            var extension = Path.GetExtension(filePath);
+            var contentType = ContentTypes.TryGetValue(extension, out var ct) ? ct : "application/octet-stream";
+
+            var bytes = File.ReadAllBytes(filePath);
+            var stream = new MemoryStream(bytes);
+            e.Response = environment.CreateWebResourceResponse(
+                stream, 200, "OK", $"Content-Type: {contentType}");
+        }
+
         private async void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
             if (sender is not CoreWebView2 coreWebView2) return;
 
             // See class remarks: never process a bridge call from anything
             // other than Mozart's own internal pages.
-            if (string.IsNullOrEmpty(e.Source) ||
-                !e.Source.StartsWith(InternalPages.BaseUrl, StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrEmpty(e.Source) || !InternalPages.IsInternalUrl(e.Source))
             {
                 return;
             }
+
+            bool isPrivate;
+            lock (_lock) isPrivate = _isPrivate.TryGetValue(coreWebView2, out var p) && p;
 
             string? raw;
             try { raw = e.TryGetWebMessageAsString(); }
@@ -151,7 +231,7 @@ namespace MozartBrowser.Services.Browser
 
                 try
                 {
-                    var result = await handler(payload);
+                    var result = await handler(payload, isPrivate);
                     await ReplyAsync(coreWebView2, id, ok: true, result: result, error: null);
                 }
                 catch (Exception ex)

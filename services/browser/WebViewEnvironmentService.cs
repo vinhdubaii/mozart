@@ -74,11 +74,13 @@ namespace MozartBrowser.Services.Browser
             {
                 // Required for CoreWebView2Profile.AddBrowserExtensionAsync and
                 // friends to work at all — must be set before the environment is
-                // created, can't be toggled afterward. Normal profile only: never
-                // set this on PrivateEnvironment below, matching Chromium's
-                // default of no extensions in Incognito.
+                // created, can't be toggled afterward. Also set on
+                // PrivateEnvironment below — installed extensions are allowed
+                // to run in Private windows too, gated per-extension by
+                // InstalledExtension.AllowedInIncognito (see ExtensionService).
                 AreBrowserExtensionsEnabled = true
             };
+            RegisterMozartScheme(options);
             NormalEnvironment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: FixedRuntimeFolder,
                 userDataFolder: userDataFolder,
@@ -93,13 +95,38 @@ namespace MozartBrowser.Services.Browser
             _privateTempFolder = Path.Combine(Path.GetTempPath(), "MozartBrowserPrivate_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_privateTempFolder);
 
-            var options = new CoreWebView2EnvironmentOptions(BuildBrowserArguments());
+            var options = new CoreWebView2EnvironmentOptions(BuildBrowserArguments())
+            {
+                AreBrowserExtensionsEnabled = true
+            };
+            RegisterMozartScheme(options);
             PrivateEnvironment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: FixedRuntimeFolder,
                 userDataFolder: _privateTempFolder,
                 options: options);
 
             return PrivateEnvironment;
+        }
+
+        /// <summary>
+        /// Registers Mozart's internal-page scheme ("mozart://newtab",
+        /// "mozart://settings", ...) as a real custom scheme — secure (so
+        /// fetch/relative-asset/CORS-sensitive APIs work the same way they
+        /// did under the old https virtual-host mapping) and with an
+        /// authority component (so "history" in "mozart://history" parses as
+        /// the host WebResourceRequested sees — see InternalPageBridge).
+        /// Must be set before CreateAsync; cannot be changed afterward, which
+        /// is why both environments call this from their own init method
+        /// rather than a shared post-creation step.
+        /// </summary>
+        private static void RegisterMozartScheme(CoreWebView2EnvironmentOptions options)
+        {
+            var registration = new CoreWebView2CustomSchemeRegistration(InternalPages.Scheme)
+            {
+                TreatAsSecure = true,
+                HasAuthorityComponent = true
+            };
+            options.CustomSchemeRegistrations.Add(registration);
         }
 
         /// <summary>Deletes the temp profile used for private browsing. Call when the last private window closes.</summary>

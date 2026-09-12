@@ -47,6 +47,13 @@
                         <div class="mozart-row-title">${MozartPage.escapeHtml(ext.name)} <span class="mozart-text-secondary" style="font-weight:400;">v${MozartPage.escapeHtml(ext.version)}</span></div>
                         ${ext.description ? `<div class="ext-desc">${MozartPage.escapeHtml(ext.description)}</div>` : ""}
                         ${optionsLink}
+                        <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                            <label class="mozart-switch" title="Allow this extension to run in Private windows">
+                                <input type="checkbox" data-action="toggle-incognito" data-id="${MozartPage.escapeHtml(ext.id)}" ${ext.allowedInIncognito ? "checked" : ""} />
+                                <span></span>
+                            </label>
+                            <span class="mozart-text-secondary" style="font-size:12px;">Allow in Incognito</span>
+                        </div>
                     </div>
                     <div class="mozart-row-actions">
                         <label class="mozart-switch" title="${ext.isEnabled ? "Disable" : "Enable"}">
@@ -85,6 +92,21 @@
             input.disabled = true;
             try {
                 await MozartBridge.call("extensions.setEnabled", { id, enabled: input.checked });
+            } catch (err) {
+                input.checked = !input.checked;
+                MozartPage.toast(`Couldn't update: ${err.message}`);
+            } finally {
+                input.disabled = false;
+            }
+        });
+
+        resultsEl.addEventListener("change", async (e) => {
+            const input = e.target.closest("input[data-action='toggle-incognito']");
+            if (!input) return;
+            const id = input.dataset.id;
+            input.disabled = true;
+            try {
+                await MozartBridge.call("extensions.setAllowedInIncognito", { id, allowed: input.checked });
             } catch (err) {
                 input.checked = !input.checked;
                 MozartPage.toast(`Couldn't update: ${err.message}`);
