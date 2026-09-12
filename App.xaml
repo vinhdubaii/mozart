@@ -19,11 +19,11 @@
                      brushes it references (DynamicResource) change with the theme. -->
                 <ResourceDictionary Source="Themes/ControlStyles.xaml"/>
 
-                <!-- 25 DataTemplate icon resources ("Icon.OpenLinkNewWindow", "Icon.CopyLink",
-                     etc.) for the page context menu - see Services/ContextMenuBuilder.cs and
-                     the top-of-file notes in ContextMenuIcons.xaml itself for why these are
-                     DataTemplates rather than plain Geometry resources. -->
-                <ResourceDictionary Source="Themes/ContextMenuIcons.xaml"/>
+                <!-- Every icon in the app (toolbar/window controls, page context menu,
+                     hamburger menu, Extensions popup) - Material Symbols, Geometry +
+                     DataTemplate resources keyed "Icon.*" - see the top-of-file notes
+                     in Icons.xaml itself for the two resource shapes and why. -->
+                <ResourceDictionary Source="Themes/Icons.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
             <!-- ===================== Shared button style for title bar / toolbar icons =====================
@@ -104,6 +104,21 @@
                 <Setter Property="StrokeLineJoin" Value="Round"/>
                 <Setter Property="StrokeStartLineCap" Value="Round"/>
                 <Setter Property="StrokeEndLineCap" Value="Round"/>
+            </Style>
+
+            <!-- Fill-based counterpart to NavIconPath, for the Material Symbols icon
+                 set (Themes/Icons.xaml): those are solid filled shapes, not stroke
+                 skeletons, so Fill carries the icon and there's no Stroke at all.
+                 Used for the toolbar and window-control buttons currently being
+                 migrated to Material Symbols. NavIconPath above is left as-is for
+                 windows still on the old icon set (Settings, Password Manager,
+                 Private window). -->
+            <Style x:Key="NavIconPathFilled" TargetType="Path">
+                <Setter Property="Width" Value="18"/>
+                <Setter Property="Height" Value="18"/>
+                <Setter Property="Stretch" Value="Uniform"/>
+                <Setter Property="Fill" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="Stroke" Value="{x:Null}"/>
             </Style>
 
             <!-- Same look as NavIconPath, smaller, for icons that sit inline next

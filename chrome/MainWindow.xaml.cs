@@ -535,9 +535,9 @@ namespace MozartBrowser.Chrome
 
         private async System.Threading.Tasks.Task UpdateBookmarkStarAsync(string url)
         {
-            if (string.IsNullOrEmpty(url)) { BookmarkStarPath.Fill = Brushes.Transparent; return; }
+            if (string.IsNullOrEmpty(url)) { BookmarkStarPath.Fill = (Brush)FindResource("TextPrimaryBrush"); return; }
             var bookmarked = await App.Bookmarks.IsBookmarkedAsync(url);
-            BookmarkStarPath.Fill = bookmarked ? (Brush)FindResource("AccentBrush") : Brushes.Transparent;
+            BookmarkStarPath.Fill = bookmarked ? (Brush)FindResource("AccentBrush") : (Brush)FindResource("TextPrimaryBrush");
         }
 
         private void AddressBarTextBox_GotFocus(object sender, RoutedEventArgs e) => AddressBarTextBox.SelectAll();
@@ -630,13 +630,15 @@ namespace MozartBrowser.Chrome
                         Header = ext.Name,
                         IsCheckable = true,
                         IsChecked = isPinned,
-                        StaysOpenOnClick = true
+                        StaysOpenOnClick = true,
+                        Icon = new ContentControl { ContentTemplate = (DataTemplate)FindResource(isPinned ? "Icon.Ext.Unpin" : "Icon.Ext.Pin") }
                     };
                     item.Click += async (_, _) =>
                     {
                         var pinned = App.Settings.Current.PinnedExtensionIds;
                         if (item.IsChecked && !pinned.Contains(ext.Id)) pinned.Add(ext.Id);
                         else if (!item.IsChecked) pinned.Remove(ext.Id);
+                        item.Icon = new ContentControl { ContentTemplate = (DataTemplate)FindResource(item.IsChecked ? "Icon.Ext.Unpin" : "Icon.Ext.Pin") };
                         await App.Settings.SaveAsync();
                         RebuildPinnedExtensionIcons();
                     };
@@ -645,7 +647,11 @@ namespace MozartBrowser.Chrome
             }
 
             popup.Items.Add(new Separator());
-            var manageItem = new MenuItem { Header = "Manage extensions" };
+            var manageItem = new MenuItem
+            {
+                Header = "Manage extensions",
+                Icon = new ContentControl { ContentTemplate = (DataTemplate)FindResource("Icon.Ext.Manage") }
+            };
             manageItem.Click += (_, _) => OpenSettingsToExtensions();
             popup.Items.Add(manageItem);
 
@@ -764,13 +770,19 @@ namespace MozartBrowser.Chrome
         {
             var menu = new ContextMenu();
 
-            menu.Items.Add(MenuItem("New Tab", "Ctrl+T", async (_, _) => await CreateNewTabAsync()));
-            menu.Items.Add(MenuItem("New Private Window", "Ctrl+Shift+N", (_, _) => OpenPrivateWindow()));
+            menu.Items.Add(MenuItem("New Tab", "Ctrl+T", async (_, _) => await CreateNewTabAsync(), "Icon.Menu.NewTab"));
+            menu.Items.Add(MenuItem("New Private Window", "Ctrl+Shift+N", (_, _) => OpenPrivateWindow(), "Icon.Menu.NewPrivateWindow"));
             menu.Items.Add(new Separator());
             menu.Items.Add(BuildZoomMenuItem());
             menu.Items.Add(new Separator());
 
-            var showBookmarkBar = new MenuItem { Header = "Show Bookmark Bar", IsCheckable = true, IsChecked = App.Settings.Current.ShowBookmarkBar };
+            var showBookmarkBar = new MenuItem
+            {
+                Header = "Show Bookmark Bar",
+                IsCheckable = true,
+                IsChecked = App.Settings.Current.ShowBookmarkBar,
+                Icon = new ContentControl { ContentTemplate = (DataTemplate)FindResource("Icon.Menu.ShowBookmarkBar") }
+            };
             showBookmarkBar.Click += async (_, _) =>
             {
                 App.Settings.Current.ShowBookmarkBar = showBookmarkBar.IsChecked;
@@ -780,25 +792,27 @@ namespace MozartBrowser.Chrome
             menu.Items.Add(showBookmarkBar);
             menu.Items.Add(new Separator());
 
-            menu.Items.Add(MenuItem("Find in Page...", "Ctrl+F", (_, _) => _activeTab?.WebView.CoreWebView2.ExecuteScriptAsync("undefined")));
-            menu.Items.Add(MenuItem("Print...", "Ctrl+P", (_, _) => _activeTab?.WebView.CoreWebView2.ShowPrintUI()));
+            menu.Items.Add(MenuItem("Find in Page...", "Ctrl+F", (_, _) => _activeTab?.WebView.CoreWebView2.ExecuteScriptAsync("undefined"), "Icon.Menu.FindInPage"));
+            menu.Items.Add(MenuItem("Print...", "Ctrl+P", (_, _) => _activeTab?.WebView.CoreWebView2.ShowPrintUI(), "Icon.Print"));
             menu.Items.Add(new Separator());
 
-            menu.Items.Add(MenuItem("Settings", null, (_, _) => _ = CreateNewTabAsync(InternalPages.SettingsUrl)));
-            menu.Items.Add(MenuItem("About Mozart Browser", null, (_, _) => ShowAbout()));
+            menu.Items.Add(MenuItem("Settings", null, (_, _) => _ = CreateNewTabAsync(InternalPages.SettingsUrl), "Icon.Menu.Settings"));
+            menu.Items.Add(MenuItem("About Mozart Browser", null, (_, _) => ShowAbout(), "Icon.Menu.About"));
             menu.Items.Add(new Separator());
 
-            menu.Items.Add(MenuItem("Exit", null, (_, _) => Close()));
+            menu.Items.Add(MenuItem("Exit", null, (_, _) => Close(), "Icon.Menu.Exit"));
 
             menu.PlacementTarget = MenuButton;
             menu.IsOpen = true;
             await System.Threading.Tasks.Task.CompletedTask;
         }
 
-        private static MenuItem MenuItem(string header, string? gesture, RoutedEventHandler handler)
+        private static MenuItem MenuItem(string header, string? gesture, RoutedEventHandler handler, string? iconKey = null)
         {
             var item = new MenuItem { Header = header, InputGestureText = gesture ?? string.Empty };
             item.Click += handler;
+            if (iconKey is not null && Application.Current.TryFindResource(iconKey) is DataTemplate iconTemplate)
+                item.Icon = new ContentControl { ContentTemplate = iconTemplate };
             return item;
         }
 
@@ -828,32 +842,26 @@ namespace MozartBrowser.Chrome
 
             void RefreshPercentText() => percentText.Text = $"{Math.Round(CurrentZoom * 100)}%";
 
-            var zoomOutButton = new Button { Content = "－", Style = smallIconStyle, Width = 26, Height = 26, ToolTip = "Zoom out (Ctrl+-)" };
+            System.Windows.Shapes.Path IconPath(string resourceKey, double size = 14) => new()
+            {
+                Width = size, Height = size, Stretch = Stretch.Uniform,
+                Fill = textBrush, Stroke = null,
+                Data = (Geometry)FindResource(resourceKey)
+            };
+
+            var zoomOutButton = new Button { Content = IconPath("Icon.Menu.ZoomOut"), Style = smallIconStyle, Width = 26, Height = 26, ToolTip = "Zoom out (Ctrl+-)" };
             zoomOutButton.Click += (_, _) => { ZoomOut(); RefreshPercentText(); };
 
-            var zoomInButton = new Button { Content = "＋", Style = smallIconStyle, Width = 26, Height = 26, ToolTip = "Zoom in (Ctrl++)" };
+            var zoomInButton = new Button { Content = IconPath("Icon.Menu.ZoomIn"), Style = smallIconStyle, Width = 26, Height = 26, ToolTip = "Zoom in (Ctrl++)" };
             zoomInButton.Click += (_, _) => { ZoomIn(); RefreshPercentText(); };
 
-            var fullScreenButton = new Button
+            var fullScreenIcon = IconPath("Icon.Menu.Fullscreen");
+            var fullScreenButton = new Button { Content = fullScreenIcon, Style = smallIconStyle, Width = 26, Height = 26, ToolTip = "Full screen (F11)" };
+            fullScreenButton.Click += (_, _) =>
             {
-                Content = new System.Windows.Shapes.Path
-                {
-                    Width = 14, Height = 14, Stretch = Stretch.Uniform,
-                    Fill = Brushes.Transparent, Stroke = textBrush,
-                    StrokeThickness = 1.5, StrokeLineJoin = PenLineJoin.Round,
-                    StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
-                    Data = Geometry.Parse(
-                        "M6,9.99739C6.01447,8.29083 6.10921,7.35004 6.72963,6.72963C7.35004,6.10921 8.29083,6.01447 9.99739,6" +
-                        "M6,14.0007C6.01447,15.7072 6.10921,16.648 6.72963,17.2684C7.35004,17.8888 8.29083,17.9836 9.99739,17.998" +
-                        "M17.9976,9.99739C17.9831,8.29083 17.8883,7.35004 17.2679,6.72963C16.6475,6.10921 15.7067,6.01447 14.0002,6" +
-                        "M17.9976,14.0007C17.9831,15.7072 17.8883,16.648 17.2679,17.2684C16.6475,17.8888 15.7067,17.9836 14.0002,17.998" +
-                        "M22,12C22,16.714 22,19.0711 20.5355,20.5355C19.0711,22 16.714,22 12,22C7.28595,22 4.92893,22 3.46447,20.5355" +
-                        "C2,19.0711 2,16.714 2,12C2,7.28595 2,4.92893 3.46447,3.46447C4.92893,2 7.28595,2 12,2C16.714,2 19.0711,2 20.5355,3.46447" +
-                        "C21.5093,4.43821 21.8356,5.80655 21.9449,8")
-                },
-                Style = smallIconStyle, Width = 26, Height = 26, ToolTip = "Full screen (F11)"
+                ToggleFullScreen();
+                fullScreenIcon.Data = (Geometry)FindResource(_isFullScreen ? "Icon.Menu.FullscreenExit" : "Icon.Menu.Fullscreen");
             };
-            fullScreenButton.Click += (_, _) => ToggleFullScreen();
 
             // Margins/label width trimmed down from their original values now
             // that the icon/checkmark gutter columns (see ControlStyles.xaml's
@@ -861,7 +869,10 @@ namespace MozartBrowser.Chrome
             // regardless of content - this row doesn't need to compensate for
             // that anymore to land close to Chrome/Edge's own Zoom row width.
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2), VerticalAlignment = VerticalAlignment.Center };
-            row.Children.Add(new TextBlock { Text = "🔍", FontSize = 12, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = textBrush });
+            var searchIcon = IconPath("Icon.Menu.Search", 12);
+            searchIcon.Margin = new Thickness(0, 0, 6, 0);
+            searchIcon.VerticalAlignment = VerticalAlignment.Center;
+            row.Children.Add(searchIcon);
             row.Children.Add(new TextBlock { Text = "Zoom", Width = 46, VerticalAlignment = VerticalAlignment.Center, Foreground = textBrush });
             row.Children.Add(zoomOutButton);
             row.Children.Add(percentText);
@@ -1014,7 +1025,7 @@ namespace MozartBrowser.Chrome
                     Width = _preFullScreenBounds.Width;
                     Height = _preFullScreenBounds.Height;
                 }
-                MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "▢";
+                MaximizeIconPath.Data = (Geometry)FindResource(WindowState == WindowState.Maximized ? "Icon.Nav.Restore" : "Icon.Nav.Maximize");
 
                 ToolbarRow.Visibility = Visibility.Visible;
                 TabStripBorder.Visibility = Tabs.Count >= 2 ? Visibility.Visible : Visibility.Collapsed;
@@ -1085,7 +1096,7 @@ namespace MozartBrowser.Chrome
         private void MaximizeButton_Click(object sender, RoutedEventArgs e)
         {
             WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-            MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "▢";
+            MaximizeIconPath.Data = (Geometry)FindResource(WindowState == WindowState.Maximized ? "Icon.Nav.Restore" : "Icon.Nav.Maximize");
         }
 
         // Session save, settings persistence, and "clear on close" all happen in
