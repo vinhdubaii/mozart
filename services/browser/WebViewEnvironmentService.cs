@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
@@ -70,18 +71,13 @@ namespace MozartBrowser.Services.Browser
             var userDataFolder = Path.Combine(_appDataFolder, "WebView2Profile");
             Directory.CreateDirectory(userDataFolder);
 
-            var options = new CoreWebView2EnvironmentOptions
-            {
-                AdditionalBrowserArguments = BuildBrowserArguments(),
-                // Required for CoreWebView2Profile.AddBrowserExtensionAsync and
-                // friends to work at all — must be set before the environment is
-                // created, can't be toggled afterward. Also set on
-                // PrivateEnvironment below — installed extensions are allowed
-                // to run in Private windows too, gated per-extension by
-                // InstalledExtension.AllowedInIncognito (see ExtensionService).
-                AreBrowserExtensionsEnabled = true
-            };
-            RegisterMozartScheme(options);
+            // Required for CoreWebView2Profile.AddBrowserExtensionAsync and
+            // friends to work at all — must be set before the environment is
+            // created, can't be toggled afterward. Also set on
+            // PrivateEnvironment below — installed extensions are allowed
+            // to run in Private windows too, gated per-extension by
+            // InstalledExtension.AllowedInIncognito (see ExtensionService).
+            var options = CreateEnvironmentOptions(areBrowserExtensionsEnabled: true);
             NormalEnvironment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: FixedRuntimeFolder,
                 userDataFolder: userDataFolder,
@@ -96,12 +92,7 @@ namespace MozartBrowser.Services.Browser
             _privateTempFolder = Path.Combine(Path.GetTempPath(), "MozartBrowserPrivate_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_privateTempFolder);
 
-            var options = new CoreWebView2EnvironmentOptions
-            {
-                AdditionalBrowserArguments = BuildBrowserArguments(),
-                AreBrowserExtensionsEnabled = true
-            };
-            RegisterMozartScheme(options);
+            var options = CreateEnvironmentOptions(areBrowserExtensionsEnabled: true);
             PrivateEnvironment = await CoreWebView2Environment.CreateAsync(
                 browserExecutableFolder: FixedRuntimeFolder,
                 userDataFolder: _privateTempFolder,
@@ -111,33 +102,38 @@ namespace MozartBrowser.Services.Browser
         }
 
         /// <summary>
-        /// Registers Mozart's internal-page scheme ("mozart://newtab",
-        /// "mozart://settings", ...) as a real custom scheme — secure (so
-        /// fetch/relative-asset/CORS-sensitive APIs work the same way they
-        /// did under the old https virtual-host mapping) and with an
-        /// authority component (so "history" in "mozart://history" parses as
-        /// the host WebResourceRequested sees — see InternalPageBridge).
-        /// Must be set before CreateAsync; cannot be changed afterward, which
-        /// is why both environments call this from their own init method
-        /// rather than a shared post-creation step.
+        /// Builds the CoreWebView2EnvironmentOptions shared by both environments,
+        /// including Mozart's internal-page scheme ("mozart://newtab",
+        /// "mozart://settings", ...) registered as a real custom scheme — secure
+        /// (so fetch/relative-asset/CORS-sensitive APIs work the same way they
+        /// did under the old https virtual-host mapping) and with an authority
+        /// component (so "history" in "mozart://history" parses as the host
+        /// WebResourceRequested sees — see InternalPageBridge).
         ///
-        /// IMPORTANT: options must come from CoreWebView2EnvironmentOptions's
-        /// PARAMETERLESS constructor — CustomSchemeRegistrations is a
-        /// read-only IList (no setter, so it can't be reassigned) that's
-        /// only pre-populated with an empty list on that code path in this
-        /// SDK version (1.0.4129.50); building the same options object via
-        /// the (string additionalBrowserArguments) constructor overload
-        /// leaves it null and .Add() below throws a NullReferenceException.
-        /// Set AdditionalBrowserArguments as a property instead (see callers).
+        /// IMPORTANT: on this SDK version (1.0.4129.50),
+        /// CoreWebView2EnvironmentOptions.CustomSchemeRegistrations is a
+        /// get-only List&lt;T&gt; that comes back null regardless of which
+        /// constructor built the options object (parameterless or the (string
+        /// additionalBrowserArguments) overload) — .Add()'ing into it throws
+        /// NullReferenceException either way. The only reliable path is to
+        /// build the list ourselves and pass it into the constructor overload
+        /// that accepts customSchemeRegistrations directly, before the
+        /// environment is created (it can't be changed afterward).
         /// </summary>
-        private static void RegisterMozartScheme(CoreWebView2EnvironmentOptions options)
+        private CoreWebView2EnvironmentOptions CreateEnvironmentOptions(bool areBrowserExtensionsEnabled)
         {
-            var registration = new CoreWebView2CustomSchemeRegistration(InternalPages.Scheme)
+            var schemeRegistration = new CoreWebView2CustomSchemeRegistration(InternalPages.Scheme)
             {
                 TreatAsSecure = true,
                 HasAuthorityComponent = true
             };
-            options.CustomSchemeRegistrations.Add(registration);
+
+            return new CoreWebView2EnvironmentOptions(
+                additionalBrowserArguments: BuildBrowserArguments(),
+                customSchemeRegistrations: new List<CoreWebView2CustomSchemeRegistration> { schemeRegistration })
+            {
+                AreBrowserExtensionsEnabled = areBrowserExtensionsEnabled
+            };
         }
 
         /// <summary>Deletes the temp profile used for private browsing. Call when the last private window closes.</summary>
