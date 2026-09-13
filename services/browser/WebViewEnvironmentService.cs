@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
@@ -71,8 +70,9 @@ namespace MozartBrowser.Services.Browser
             var userDataFolder = Path.Combine(_appDataFolder, "WebView2Profile");
             Directory.CreateDirectory(userDataFolder);
 
-            var options = new CoreWebView2EnvironmentOptions(BuildBrowserArguments())
+            var options = new CoreWebView2EnvironmentOptions
             {
+                AdditionalBrowserArguments = BuildBrowserArguments(),
                 // Required for CoreWebView2Profile.AddBrowserExtensionAsync and
                 // friends to work at all — must be set before the environment is
                 // created, can't be toggled afterward. Also set on
@@ -96,8 +96,9 @@ namespace MozartBrowser.Services.Browser
             _privateTempFolder = Path.Combine(Path.GetTempPath(), "MozartBrowserPrivate_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_privateTempFolder);
 
-            var options = new CoreWebView2EnvironmentOptions(BuildBrowserArguments())
+            var options = new CoreWebView2EnvironmentOptions
             {
+                AdditionalBrowserArguments = BuildBrowserArguments(),
                 AreBrowserExtensionsEnabled = true
             };
             RegisterMozartScheme(options);
@@ -119,6 +120,15 @@ namespace MozartBrowser.Services.Browser
         /// Must be set before CreateAsync; cannot be changed afterward, which
         /// is why both environments call this from their own init method
         /// rather than a shared post-creation step.
+        ///
+        /// IMPORTANT: options must come from CoreWebView2EnvironmentOptions's
+        /// PARAMETERLESS constructor — CustomSchemeRegistrations is a
+        /// read-only IList (no setter, so it can't be reassigned) that's
+        /// only pre-populated with an empty list on that code path in this
+        /// SDK version (1.0.4129.50); building the same options object via
+        /// the (string additionalBrowserArguments) constructor overload
+        /// leaves it null and .Add() below throws a NullReferenceException.
+        /// Set AdditionalBrowserArguments as a property instead (see callers).
         /// </summary>
         private static void RegisterMozartScheme(CoreWebView2EnvironmentOptions options)
         {
@@ -127,7 +137,7 @@ namespace MozartBrowser.Services.Browser
                 TreatAsSecure = true,
                 HasAuthorityComponent = true
             };
-            options.CustomSchemeRegistrations = new List<CoreWebView2CustomSchemeRegistration> { registration };
+            options.CustomSchemeRegistrations.Add(registration);
         }
 
         /// <summary>Deletes the temp profile used for private browsing. Call when the last private window closes.</summary>
