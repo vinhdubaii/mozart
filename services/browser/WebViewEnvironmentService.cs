@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
@@ -126,7 +127,7 @@ namespace MozartBrowser.Services.Browser
                 TreatAsSecure = true,
                 HasAuthorityComponent = true
             };
-            options.CustomSchemeRegistrations.Add(registration);
+            options.CustomSchemeRegistrations = new List<CoreWebView2CustomSchemeRegistration> { registration };
         }
 
         /// <summary>Deletes the temp profile used for private browsing. Call when the last private window closes.</summary>
